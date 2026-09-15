@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/*
+  Tokens semánticos de Prota Code.
+
+  Todo el color del sitio sale de acá. Un componente nunca escribe un color a mano:
+  usa `bg-background`, `text-muted`, `border-border`, `bg-accent`. Cambiar la marca
+  es cambiar este bloque y nada más.
+
+  La paleta sale de los assets reales: el azul profundo del fondo de la portada y el
+  azul eléctrico del logo.
+*/
+:root {
+  color-scheme: dark;
+
+  /* Paleta oficial de Prota Code. */
+  --background: #111827;
+  --surface: #1c2638;
+  --border: #2c3a4f;
+  --foreground: #eef2f7;
+  --muted: #94a3b8;
+  --accent: #d47a42;
+  --danger: #e5484d;
+
+  /*
+    El cobre #D47A42 sobre el fondo da 5,60:1, asi que si sirve como texto. Lo que
+    NO sirve es blanco encima del cobre: da 3,15:1 y no llega al minimo de 4,5:1.
+    Por eso el texto de los botones cobre es el color del fondo (5,60:1).
+  */
+  --accent-foreground: #111827;
+
+  /*
+    El acento claro. Se usa cuando el cobre tiene que leerse como texto fino o como
+    linea: sobre el fondo da 8,72:1, bastante mas holgado que el cobre pleno.
+  */
+  --accent-contrast: #f0a66b;
+}
+
+
+/*
+  Cortes de pantalla.
+
+  Se declaran los cinco, en orden de tamano, porque Tailwind los emite en el orden
+  en que aparecen y no por su valor: si `lg` se declara solo, queda antes de `sm` y
+  `md` en la hoja y esos dos terminan pisandolo.
+
+  El unico cambio respecto de los valores de fabrica es `lg`, que baja de 64rem
+  (1024 px) a 61.875rem (990 px). Motivo concreto: un monitor de 1024x768 deja un
+  viewport de ~1009 px porque la barra de desplazamiento se come unos 15, asi que
+  con el valor de fabrica esas pantallas nunca alcanzan el diseno de escritorio y
+  se quedan con el de tablet por 15 pixeles.
+*/
+@theme {
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 61.875rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+}
+
+/* Expone cada token como utilidad de Tailwind. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  min-width: 0;
+}
+
+/* El foco siempre visible: es la única guía de quien navega con teclado. */
+:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+}
+
+/*
+  Utilidades propias del sistema visual.
+
+  Van dentro de `@layer components` a proposito: Tailwind emite sus utilidades en su
+  propia capa, y una regla SIN capa le gana siempre a una regla EN capa, sin importar
+  el orden. Sin este `@layer`, escribir `eyebrow text-accent-contrast` no cambiaba
+  nada: el color de `.eyebrow` pisaba a la utilidad y la etiqueta salia gris.
+*/
+@layer components {
+  /*
+    Etiqueta tecnica: el recurso tipografico que se repite en todo el sitio.
+    Condensada, chica y muy espaciada.
+  */
+  .eyebrow {
+    font-family: var(--font-display), sans-serif;
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Titular editorial: tracking cerrado y sin espacio muerto entre renglones. */
+  .display {
+    font-family: var(--font-display), sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 0.95;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+}
+
+
+/* Respeta a quien pidió menos movimiento en la configuración de su sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Para que un ancla no quede tapada por el header fijo. */
+  scroll-padding-top: 5rem;
+}
