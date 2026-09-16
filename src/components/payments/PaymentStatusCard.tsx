@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
+import { numberLocale, pick, type Locale } from "@/i18n/shared";
 import { formatMoney } from "@/lib/utils/money";
 import type { Order } from "@/types/order";
 
-const ORDER_LABEL: Record<Order["status"], string> = {
-  pending: "Pendiente",
-  paid: "Pagado",
-  failed: "Fallido",
-  cancelled: "Cancelado",
-  fulfilled: "Entregado",
+const ORDER_LABEL: Record<Order["status"], readonly [string, string, string]> = {
+  pending: ["Pendiente", "Pending", "Pendente"],
+  paid: ["Pagado", "Paid", "Pago"],
+  failed: ["Fallido", "Failed", "Falhou"],
+  cancelled: ["Cancelado", "Cancelled", "Cancelado"],
+  fulfilled: ["Entregado", "Delivered", "Entregue"],
 };
 
 interface PaymentStatusCardProps {
@@ -16,6 +17,7 @@ interface PaymentStatusCardProps {
   readonly title: string;
   readonly message: string;
   readonly order: Order | null;
+  readonly locale: Locale;
   readonly secondaryHref?: string;
   readonly secondaryLabel?: string;
 }
@@ -25,16 +27,18 @@ export function PaymentStatusCard({
   title,
   message,
   order,
+  locale,
   secondaryHref = "/carrito",
-  secondaryLabel = "Volver al carrito",
+  secondaryLabel,
 }: PaymentStatusCardProps) {
   return (
     <main id="contenido">
       <div className="mx-auto w-full max-w-[1400px] px-4 py-12 sm:px-6 sm:py-14 lg:px-10 lg:py-20">
         <Breadcrumb
+          locale={locale}
           items={[
-            { label: "Inicio", href: "/" },
-            { label: "Carrito", href: "/carrito" },
+            { label: pick(locale, "Inicio", "Home", "Início"), href: "/" },
+            { label: pick(locale, "Carrito", "Cart", "Carrinho"), href: "/carrito" },
             { label: eyebrow },
           ]}
         />
@@ -49,13 +53,21 @@ export function PaymentStatusCard({
 
               {order !== null ? (
                 <dl className="mt-8 border-t border-border sm:mt-9">
-                  <Row label="Referencia" value={order.id.slice(0, 8).toUpperCase()} />
-                  <Row label="Estado del pedido" value={ORDER_LABEL[order.status]} />
-                  <Row label="Total" value={formatMoney(order.total)} />
+                  <Row label={pick(locale, "Referencia", "Reference", "Referência")} value={order.id.slice(0, 8).toUpperCase()} />
+                  <Row
+                    label={pick(locale, "Estado del pedido", "Order status", "Status do pedido")}
+                    value={pick(locale, ...ORDER_LABEL[order.status])}
+                  />
+                  <Row label="Total" value={formatMoney(order.total, numberLocale(locale))} />
                 </dl>
               ) : (
                 <p className="mt-8 border border-border px-4 py-3 text-sm leading-relaxed text-muted">
-                  No pudimos recuperar un pedido válido con esta referencia.
+                  {pick(
+                    locale,
+                    "No pudimos recuperar un pedido válido con esta referencia.",
+                    "We could not find a valid order with this reference.",
+                    "Não foi possível encontrar um pedido válido com esta referência.",
+                  )}
                 </p>
               )}
 
@@ -64,13 +76,13 @@ export function PaymentStatusCard({
                   href="/programas"
                   className="bg-accent px-6 py-3.5 text-center text-sm font-semibold uppercase tracking-[0.08em] text-accent-foreground transition-colors hover:bg-accent-contrast"
                 >
-                  Ver programas
+                  {pick(locale, "Ver programas", "View programs", "Ver programas")}
                 </Link>
                 <Link
                   href={secondaryHref}
                   className="border border-border px-6 py-3.5 text-center text-sm font-semibold uppercase tracking-[0.08em] text-foreground transition-colors hover:border-accent"
                 >
-                  {secondaryLabel}
+                  {secondaryLabel ?? pick(locale, "Volver al carrito", "Back to cart", "Voltar ao carrinho")}
                 </Link>
               </div>
             </div>

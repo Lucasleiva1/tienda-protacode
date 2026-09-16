@@ -4,10 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { borrarImagenAction, subirImagenAction } from "@/features/admin/media-actions";
+import { subirImagenAction } from "@/features/admin/media-actions";
 import { saveProductAction } from "@/features/admin/product-actions";
 import type { ProductErrors, ProductInput } from "@/features/products/product-service";
 import { CATEGORIES, CURRENCIES, PLATFORMS } from "@/types/product";
+import { DONATION_FONTS } from "@/config/donation-fonts";
 import type { Category, Currency, Platform, Product } from "@/types/product";
 
 interface ProductFormProps {
@@ -63,6 +64,11 @@ function vacio(product: Product | null): ProductInput {
     useCases: product?.useCases ?? [],
     systemRequirements: product?.systemRequirements ?? [],
     licenseNote: product?.licenseNote ?? null,
+    pricingType: product?.pricingType ?? "paid",
+    acceptDonations: product?.acceptDonations ?? false,
+    donationAlias: product?.donationAlias ?? null,
+    donationQr: product?.donationQr ?? null,
+    donationAliasFont: product?.donationAliasFont ?? null,
     published: product?.published ?? false,
     featured: product?.featured ?? false,
     sortOrder: product?.sortOrder ?? 100,
@@ -93,7 +99,7 @@ export function ProductForm({ product }: ProductFormProps) {
     setErrores((previo) => ({ ...previo, [campo]: undefined }));
   }
 
-  async function subir(archivo: File, destino: "hero" | "galeria") {
+  async function subir(archivo: File, destino: "hero" | "galeria" | "qr") {
     setSubiendo(true);
     setMensaje("");
     const fd = new FormData();
@@ -109,9 +115,18 @@ export function ProductForm({ product }: ProductFormProps) {
     const alt =
       destino === "hero"
         ? datos.name || "Imagen del programa"
-        : `Captura de ${datos.name || "el programa"}`;
+        : destino === "qr"
+          ? `Código QR para aportar a ${datos.name || "el programa"}`
+          : `Captura de ${datos.name || "el programa"}`;
+
+    if (destino === "qr") {
+      set("donationQr", { src: resultado.url, alt });
+      return;
+    }
 
     if (destino === "hero") {
+      // La foto anterior no se borra del almacén: si se cancela sin guardar, el
+      // producto publicado tiene que seguir mostrándola.
       set("heroImage", { src: resultado.url, alt });
     } else {
       set("images", [...datos.images, { src: resultado.url, alt }]);
@@ -146,11 +161,63 @@ export function ProductForm({ product }: ProductFormProps) {
   }
 
   const guardando = pendiente;
+  const gratuito = datos.pricingType === "free";
 
   return (
     <form onSubmit={guardar} noValidate className="mt-8">
       <div className="grid gap-10 lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-12">
         <div className="space-y-10">
+          {/*
+            Primer bloque a propósito: antes estaba al fondo de la columna fija de la
+            derecha y quedaba cortado fuera de la pantalla. Por ahora una sola foto;
+            la galería sigue en los datos pero no se edita desde acá.
+          */}
+          <Bloque titulo="Foto del producto">
+            {datos.heroImage !== null ? (
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <Image
+                  src={datos.heroImage.src}
+                  alt=""
+                  width={640}
+                  height={400}
+                  unoptimized
+                  className="max-h-72 w-full border border-border bg-background object-contain"
+                />
+                <div className="flex flex-wrap gap-2 sm:flex-col">
+                  <SubirArchivo
+                    id="hero"
+                    texto="Cambiar foto"
+                    deshabilitado={subiendo}
+                    onArchivo={(f) => void subir(f, "hero")}
+                  />
+                  <button
+                    type="button"
+                    disabled={subiendo}
+                    onClick={() => set("heroImage", null)}
+                    className="mt-2 border border-border px-4 py-2.5 text-xs uppercase tracking-wider text-muted hover:border-danger/60 hover:text-foreground"
+                  >
+                    Quitar foto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="border border-dashed border-border bg-background px-5 py-8 text-center">
+                <p className="text-sm text-muted">Este producto todavía no tiene foto.</p>
+                <SubirArchivo
+                  id="hero"
+                  texto="Elegir foto"
+                  deshabilitado={subiendo}
+                  onArchivo={(f) => void subir(f, "hero")}
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted">
+              JPG, PNG o WEBP. Hasta 3 MB. Es la imagen que se ve en la tienda y en el
+              catálogo. Para que quede guardada, apretá “Guardar” al final.
+            </p>
+            {subiendo ? <p className="text-sm text-accent-contrast">Subiendo foto…</p> : null}
+          </Bloque>
+
           <Bloque titulo="Identificación">
             <Texto
               id="name"
@@ -263,29 +330,133 @@ export function ProductForm({ product }: ProductFormProps) {
           </Bloque>
         </div>
 
-        <div className="space-y-8 lg:sticky lg:top-20">
+        <div className="space-y-8">
           <Bloque titulo="Precio">
-            <Texto
-              id="priceArs"
-              label="Precio en pesos"
-              value={precioArs}
-              error={errores.priceArs}
-              onChange={setPrecioArs}
-            />
-            <Texto
-              id="priceUsd"
-              label="Precio en dólares"
-              value={precioUsd}
-              error={errores.priceUsd}
-              onChange={setPrecioUsd}
-            />
             <Selector
-              id="currency"
-              label="Moneda que se muestra"
-              value={datos.currency}
-              opciones={CURRENCIES.map((c) => ({ valor: c, texto: c }))}
-              onChange={(v) => set("currency", v as Currency)}
+              id="pricingType"
+              label="Tipo de producto"
+              value={datos.pricingType}
+              opciones={[
+                { valor: "paid", texto: "Pago" },
+                { valor: "free", texto: "Gratis" },
+              ]}
+              onChange={(v) =>
+                set("pricingType", v as ProductInput["pricingType"])
+              }
             />
+
+            {gratuito ? (
+              /* Un gratuito no muestra precio en la tienda: los campos no aplican.
+                 Lo que ya estaba cargado se conserva por si vuelve a ser pago. */
+              <p className="border border-border bg-background px-3 py-2.5 text-xs leading-relaxed text-muted">
+                Este programa se descarga gratis desde su ficha: no pasa por el
+                carrito ni por el pago, y en la tienda se muestra “GRATIS” en lugar
+                del precio.
+              </p>
+            ) : (
+              <>
+                <Texto
+                  id="priceArs"
+                  label="Precio en pesos"
+                  value={precioArs}
+                  error={errores.priceArs}
+                  onChange={setPrecioArs}
+                />
+                <Texto
+                  id="priceUsd"
+                  label="Precio en dólares"
+                  value={precioUsd}
+                  error={errores.priceUsd}
+                  onChange={setPrecioUsd}
+                />
+                <Selector
+                  id="currency"
+                  label="Moneda que se muestra"
+                  value={datos.currency}
+                  opciones={CURRENCIES.map((c) => ({ valor: c, texto: c }))}
+                  onChange={(v) => set("currency", v as Currency)}
+                />
+              </>
+            )}
+          </Bloque>
+
+          <Bloque titulo="Aportes voluntarios">
+            <Casilla
+              id="acceptDonations"
+              label="Aceptar aportes"
+              ayuda="Muestra alias y QR en la ficha. No es una compra: no genera pedido ni licencia."
+              checked={datos.acceptDonations}
+              onChange={(v) => set("acceptDonations", v)}
+            />
+
+            {datos.acceptDonations ? (
+              <>
+                <Texto
+                  id="donationAlias"
+                  label="Alias para aportes"
+                  ayuda="El alias que copia quien quiera aportar. Podés dejarlo vacío si solo usás QR."
+                  value={datos.donationAlias ?? ""}
+                  error={errores.donationAlias}
+                  onChange={(v) => set("donationAlias", v === "" ? null : v)}
+                />
+
+                <Selector
+                  id="donationAliasFont"
+                  label="Tipografía del alias"
+                  value={datos.donationAliasFont ?? "sitio"}
+                  opciones={DONATION_FONTS.map((fuente) => ({
+                    valor: fuente.key,
+                    texto: fuente.label,
+                  }))}
+                  onChange={(v) =>
+                    set("donationAliasFont", v === "sitio" ? null : v)
+                  }
+                />
+
+                <div>
+                  <p className="eyebrow">QR para aportes</p>
+                  {datos.donationQr !== null ? (
+                    <div className="mt-2">
+                      <Image
+                        src={datos.donationQr.src}
+                        alt=""
+                        width={200}
+                        height={200}
+                        unoptimized
+                        className="h-auto w-40 border border-border bg-background p-2"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <SubirArchivo
+                          id="qr"
+                          texto="Cambiar QR"
+                          deshabilitado={subiendo}
+                          onArchivo={(f) => void subir(f, "qr")}
+                        />
+                        <button
+                          type="button"
+                          disabled={subiendo}
+                          onClick={() => set("donationQr", null)}
+                          className="mt-2 border border-border px-4 py-2.5 text-xs uppercase tracking-wider text-muted hover:border-danger/60 hover:text-foreground"
+                        >
+                          Quitar QR
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <SubirArchivo
+                      id="qr"
+                      texto="Subir QR"
+                      deshabilitado={subiendo}
+                      onArchivo={(f) => void subir(f, "qr")}
+                    />
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    JPG, PNG o WEBP. Hasta 3 MB. Si no cargás QR, se muestra solo el
+                    alias; si no cargás alias, se muestra solo el QR.
+                  </p>
+                </div>
+              </>
+            ) : null}
           </Bloque>
 
           <Bloque titulo="Ficha técnica">
@@ -350,83 +521,6 @@ export function ProductForm({ product }: ProductFormProps) {
                 set("downloadType", v as ProductInput["downloadType"])
               }
             />
-          </Bloque>
-
-          <Bloque titulo="Imágenes">
-            <div>
-              <p className="eyebrow">Imagen principal</p>
-              {datos.heroImage !== null ? (
-                <div className="mt-2">
-                  <Image
-                    src={datos.heroImage.src}
-                    alt=""
-                    width={320}
-                    height={200}
-                    className="w-full border border-border object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const anterior = datos.heroImage;
-                      set("heroImage", null);
-                      if (anterior !== null) void borrarImagenAction(anterior.src);
-                    }}
-                    className="mt-2 border border-border px-3 py-1 text-xs uppercase tracking-wider text-muted hover:border-danger/60 hover:text-foreground"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              ) : (
-                <SubirArchivo
-                  id="hero"
-                  deshabilitado={subiendo}
-                  onArchivo={(f) => void subir(f, "hero")}
-                />
-              )}
-            </div>
-
-            <div>
-              <p className="eyebrow">Galería</p>
-              {datos.images.length > 0 ? (
-                <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {datos.images.map((imagen) => (
-                    <li key={imagen.src}>
-                      <Image
-                        src={imagen.src}
-                        alt=""
-                        width={120}
-                        height={80}
-                        className="h-16 w-full border border-border object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          set(
-                            "images",
-                            datos.images.filter((i) => i.src !== imagen.src),
-                          );
-                          void borrarImagenAction(imagen.src);
-                        }}
-                        className="mt-1 w-full border border-border px-1 py-0.5 text-[0.6rem] uppercase tracking-wider text-muted hover:border-danger/60"
-                      >
-                        Quitar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="mt-2">
-                <SubirArchivo
-                  id="galeria"
-                  deshabilitado={subiendo}
-                  onArchivo={(f) => void subir(f, "galeria")}
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-muted">
-              JPG, PNG o WEBP. Hasta 3 MB.
-            </p>
           </Bloque>
 
           <Bloque titulo="Visibilidad">
@@ -650,10 +744,12 @@ function Casilla({
 
 function SubirArchivo({
   id,
+  texto = "Elegir imagen",
   deshabilitado,
   onArchivo,
 }: {
   readonly id: string;
+  readonly texto?: string;
   readonly deshabilitado: boolean;
   readonly onArchivo: (archivo: File) => void;
 }) {
@@ -661,9 +757,9 @@ function SubirArchivo({
     <div className="mt-2">
       <label
         htmlFor={`subir-${id}`}
-        className="inline-block cursor-pointer border border-dashed border-border px-4 py-2.5 text-xs uppercase tracking-wider text-muted transition-colors hover:border-accent hover:text-foreground"
+        className="inline-block cursor-pointer border border-accent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
-        Elegir imagen
+        {texto}
       </label>
       <input
         id={`subir-${id}`}

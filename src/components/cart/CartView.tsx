@@ -13,11 +13,14 @@ import {
   useCartStore,
 } from "@/features/cart/cart-store";
 import { platformsLabel, primaryPrice } from "@/features/products/format";
+import { localizeProduct } from "@/i18n/product-copy";
+import { pick, type Locale } from "@/i18n/shared";
 import type { Currency, Product } from "@/types/product";
 
 interface CartViewProps {
   /** Catálogo actual, resuelto en el servidor. El store solo guarda slugs. */
   readonly catalog: readonly Product[];
+  readonly locale: Locale;
   readonly currency: Currency;
   readonly whatsappRequested: boolean;
   readonly whatsappEnabled: boolean;
@@ -25,6 +28,7 @@ interface CartViewProps {
 
 export function CartView({
   catalog,
+  locale,
   currency,
   whatsappRequested,
   whatsappEnabled,
@@ -57,7 +61,7 @@ export function CartView({
         aria-busy="true"
         className="h-64 border border-border bg-surface"
       >
-        <span className="sr-only">Cargando tu carrito…</span>
+        <span className="sr-only">{pick(locale, "Cargando tu carrito…", "Loading your cart…", "Carregando seu carrinho…")}</span>
       </div>
     );
   }
@@ -65,17 +69,17 @@ export function CartView({
   const productos = resolucion.products;
 
   if (productos.length === 0) {
-    return <EmptyCart />;
+    return <EmptyCart locale={locale} />;
   }
 
   function quitar(producto: Product) {
     removeItem(producto.slug);
-    setAviso(`${producto.name} fue eliminado del carrito.`);
+    setAviso(pick(locale, `${localizeProduct(producto, locale).name} fue eliminado del carrito.`, `${localizeProduct(producto, locale).name} was removed from your cart.`, `${localizeProduct(producto, locale).name} foi removido do carrinho.`));
   }
 
   function vaciar() {
     clear();
-    setAviso("Se vaciaron todos los programas del carrito.");
+    setAviso(pick(locale, "Se vaciaron todos los programas del carrito.", "All programs were removed from your cart.", "Todos os programas foram removidos do carrinho."));
   }
 
   return (
@@ -85,7 +89,7 @@ export function CartView({
       </p>
 
       <p className="eyebrow mb-8">
-        {productos.length === 1 ? "1 programa" : `${productos.length} programas`}
+        {productos.length === 1 ? pick(locale, "1 programa", "1 program", "1 programa") : `${productos.length} ${pick(locale, "programas", "programs", "programas")}`}
       </p>
 
       <div className="grid gap-10 lg:grid-cols-[1.9fr_1fr] lg:items-start lg:gap-14">
@@ -114,39 +118,39 @@ export function CartView({
                       href={`/programas/${producto.slug}`}
                       className="transition-colors hover:text-accent-contrast"
                     >
-                      {producto.name}
+                      {localizeProduct(producto, locale).name}
                     </Link>
                   </h2>
 
                   <p className="mt-2 text-sm leading-relaxed text-muted">
-                    {producto.shortDescription}
+                    {localizeProduct(producto, locale).shortDescription}
                   </p>
 
                   <p className="eyebrow mt-3">
                     {platformsLabel(producto.platforms)}
                     <span className="px-2 text-border">·</span>
-                    versión {producto.version}
+                    {pick(locale, "versión", "version", "versão")} {producto.version}
                     <span className="px-2 text-border">·</span>
-                    1 licencia
+                    {pick(locale, "1 licencia", "1 license", "1 licença")}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-6 sm:flex-col sm:items-end sm:justify-start sm:gap-3">
                   <div className="sm:text-right">
                     <p className="text-xl font-semibold tracking-tight">
-                      {primaryPrice(producto)}
+                      {primaryPrice(producto, locale)}
                     </p>
-                    <p className="eyebrow mt-1 text-accent-contrast">Pago único</p>
+                    <p className="eyebrow mt-1 text-accent-contrast">{pick(locale, "Pago único", "One-time payment", "Pagamento único")}</p>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => quitar(producto)}
-                    aria-label={`Eliminar ${producto.name} del carrito`}
+                    aria-label={`Eliminar ${localizeProduct(producto, locale).name} del carrito`}
                     className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-muted transition-colors hover:border-danger/60 hover:text-foreground"
                   >
                     <CloseIcon className="h-3.5 w-3.5" />
-                    Eliminar
+                    {pick(locale, "Eliminar", "Remove", "Remover")}
                   </button>
                 </div>
               </li>
@@ -159,13 +163,14 @@ export function CartView({
               onClick={vaciar}
               className="mt-6 text-sm text-muted underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-danger"
             >
-              Vaciar carrito
+              {pick(locale, "Vaciar carrito", "Empty cart", "Esvaziar carrinho")}
             </button>
           ) : null}
         </div>
 
         <CartSummary
           count={productos.length}
+          locale={locale}
           subtotal={resolucion.subtotal}
           whatsappRequested={whatsappRequested}
           whatsappEnabled={whatsappEnabled}

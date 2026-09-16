@@ -1,26 +1,26 @@
-const CONCEPTOS = [
-  {
-    titulo: "Pago único",
-    detalle: "Un solo pago. No hay renovación ni vencimiento de cobro.",
-  },
-  {
-    titulo: "Sin suscripción",
-    detalle: "No hay cuota mensual ni anual. No se guarda una tarjeta.",
-  },
-  {
-    titulo: "Licencia permanente",
-    detalle: "Licencia de uso permanente para la versión adquirida.",
-  },
-] as const;
+import { getLocale } from "@/i18n/server";
+import { pick } from "@/i18n/shared";
 
-/**
- * La sección de identidad de la marca.
- *
- * Rompe el ritmo del resto de la página: fondo distinto y una composición
- * tipográfica grande de tres renglones. Es el único lugar donde el tipo de letra
- * manda por encima de todo, y por eso no lleva ni un ícono.
- */
-export function SoftwareWithoutRent() {
+const CONCEPTS = {
+  es: [
+    { title: "Pago único", detail: "Un solo pago. No hay renovación ni vencimiento de cobro." },
+    { title: "Sin suscripción", detail: "No hay cuota mensual ni anual. No se guarda una tarjeta." },
+    { title: "Licencia permanente", detail: "Licencia de uso permanente para la versión adquirida." },
+  ],
+  en: [
+    { title: "One-time payment", detail: "One payment. No renewal or recurring charge." },
+    { title: "No subscription", detail: "No monthly or annual fee. No card stored." },
+    { title: "Permanent license", detail: "A permanent-use license for the version purchased." },
+  ],
+  pt: [
+    { title: "Pagamento único", detail: "Um único pagamento. Sem renovação nem cobrança recorrente." },
+    { title: "Sem assinatura", detail: "Sem mensalidade nem anuidade. Nenhum cartão fica salvo." },
+    { title: "Licença permanente", detail: "Licença de uso permanente para a versão adquirida." },
+  ],
+} as const;
+
+export async function SoftwareWithoutRent() {
+  const locale = await getLocale();
   return (
     <section
       id="sin-alquiler"
@@ -33,49 +33,57 @@ export function SoftwareWithoutRent() {
             <p className="eyebrow">
               <span className="text-accent-contrast">02</span>
               <span className="px-2 text-border">/</span>
-              Filosofía
+              {pick(locale, "Filosofía", "Philosophy", "Filosofia")}
             </p>
-
             <h2
               id="sin-alquiler-titulo"
               className="display mt-8 text-5xl sm:text-7xl lg:text-[5.5rem]"
             >
               <span className="block">Software</span>
-              <span className="block text-accent-contrast">sin</span>
-              <span className="block">alquiler.</span>
+              <span className="block text-accent-contrast">
+                {pick(locale, "sin", "you", "sem")}
+              </span>
+              <span className="block">
+                {pick(locale, "alquiler.", "own.", "aluguel.")}
+              </span>
             </h2>
           </div>
-
           <div className="lg:pt-24">
             <p className="max-w-lg text-lg leading-relaxed text-foreground sm:text-xl">
-              Hay herramientas que no necesitan una cuota todos los meses.
+              {pick(
+                locale,
+                "Hay herramientas que no necesitan una cuota todos los meses.",
+                "Some tools do not need a monthly bill.", "Há ferramentas que não precisam de uma mensalidade.",
+              )}
             </p>
-
             <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-              Prota Code hace aplicaciones chicas para problemas concretos. Se compran
-              una vez, se descargan y se usan. No hay suscripción, no hay renovación y
-              no hace falta volver a pagar para seguir abriendo el programa.
+              {pick(
+                locale,
+                "Prota Code hace aplicaciones chicas para problemas concretos. Se compran una vez, se descargan y se usan. No hay suscripción, no hay renovación y no hace falta volver a pagar para seguir abriendo el programa.",
+                "Prota Code makes focused applications for specific problems. Buy them once, download, and use them. There is no subscription or renewal, and you do not have to pay again to keep using the program.", "A Prota Code faz aplicativos pequenos para problemas concretos. Você compra uma vez, baixa e usa. Não há assinatura nem renovação, e não é preciso pagar de novo para continuar abrindo o programa.",
+              )}
             </p>
-
             <dl className="mt-12 border-t border-border">
-              {CONCEPTOS.map((concepto) => (
+              {CONCEPTS[locale].map((concept) => (
                 <div
-                  key={concepto.titulo}
+                  key={concept.title}
                   className="border-b border-border py-5 sm:flex sm:items-baseline sm:gap-8"
                 >
                   <dt className="eyebrow shrink-0 text-foreground sm:w-52">
-                    {concepto.titulo}
+                    {concept.title}
                   </dt>
                   <dd className="mt-2 text-sm leading-relaxed text-muted sm:mt-0">
-                    {concepto.detalle}
+                    {concept.detail}
                   </dd>
                 </div>
               ))}
             </dl>
-
             <p className="mt-8 max-w-lg text-sm leading-relaxed text-muted">
-              No se prometen actualizaciones futuras: lo que comprás es la versión del
-              programa disponible en ese momento.
+              {pick(
+                locale,
+                "No se prometen actualizaciones futuras: lo que comprás es la versión del programa disponible en ese momento.",
+                "Future updates are not promised: you purchase the version available at that time.", "Não prometemos atualizações futuras: você compra a versão do programa disponível naquele momento.",
+              )}
             </p>
           </div>
         </div>

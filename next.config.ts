@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // La foto del producto viaja por una Server Action: 3 MB de imagen más el
+      // sobre del formulario. El límite por defecto (1 MB) la rechazaba.
+      bodySizeLimit: "4mb",
+    },
+  },
   async headers() {
     return [
       {

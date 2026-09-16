@@ -1,12 +1,14 @@
 import "server-only";
+import { resolveDonationFont } from "@/config/donation-fonts";
 import { getProductRepository } from "@/features/products/product-repository";
-import { CATEGORIES, CURRENCIES, PLATFORMS } from "@/types/product";
+import { CATEGORIES, CURRENCIES, PLATFORMS, PRICING_TYPES } from "@/types/product";
 import type {
   Category,
   Currency,
   DownloadType,
   LicenseType,
   Platform,
+  PricingType,
   Product,
   ProductFeature,
   ProductImage,
@@ -41,6 +43,13 @@ export interface ProductInput {
   readonly useCases: readonly string[];
   readonly systemRequirements: readonly ProductRequirement[];
   readonly licenseNote: string | null;
+  /** "paid" o "free". Un producto gratuito no pasa por carrito ni checkout. */
+  readonly pricingType: PricingType;
+  readonly acceptDonations: boolean;
+  readonly donationAlias: string | null;
+  readonly donationQr: ProductImage | null;
+  /** Clave de la tipografía con la que se muestra el alias. */
+  readonly donationAliasFont: string | null;
   readonly published: boolean;
   readonly featured: boolean;
   readonly sortOrder: number;
@@ -66,6 +75,12 @@ export function normalizeSlug(valor: string): string {
 const MAX_NOMBRE = 80;
 const MAX_CORTA = 160;
 const MAX_LARGA = 4000;
+const MAX_ALIAS = 80;
+
+/** Un precio inválido de un producto gratuito se guarda como 0, no como NaN. */
+function precioValido(centavos: number): number {
+  return Number.isInteger(centavos) && centavos >= 0 ? centavos : 0;
+}
 
 function limpio(valor: string): string {
   return valor.trim().replace(/\s+/g, " ");
@@ -108,10 +123,31 @@ async function construir(
 
   if (version === "") errors.version = "Indicá la versión.";
 
-  if (!Number.isInteger(input.priceArs) || input.priceArs < 0)
-    errors.priceArs = "El precio en pesos no es válido.";
-  if (!Number.isInteger(input.priceUsd) || input.priceUsd < 0)
-    errors.priceUsd = "El precio en dólares no es válido.";
+  if (!PRICING_TYPES.includes(input.pricingType))
+    errors.pricingType = "Elegí si el programa es pago o gratuito.";
+
+  const gratuito = input.pricingType === "free";
+
+  /*
+    Un programa gratuito no muestra ni cobra precio, así que no se le exige uno.
+    Lo guardado se conserva por si mañana vuelve a venderse.
+  */
+  if (!gratuito) {
+    if (!Number.isInteger(input.priceArs) || input.priceArs < 0)
+      errors.priceArs = "El precio en pesos no es válido.";
+    if (!Number.isInteger(input.priceUsd) || input.priceUsd < 0)
+      errors.priceUsd = "El precio en dólares no es válido.";
+  }
+
+  const donationAlias = limpio(input.donationAlias ?? "");
+
+  if (input.acceptDonations) {
+    if (donationAlias.length > MAX_ALIAS) {
+      errors.donationAlias = `Máximo ${MAX_ALIAS} caracteres.`;
+    } else if (donationAlias === "" && input.donationQr === null) {
+      errors.donationAlias = "Cargá el alias o subí el QR para poder recibir aportes.";
+    }
+  }
 
   if (!CURRENCIES.includes(input.currency)) errors.currency = "Moneda no válida.";
   if (!CATEGORIES.includes(input.category)) errors.category = "Categoría no válida.";
@@ -148,8 +184,8 @@ async function construir(
     shortDescription,
     description,
     price: {
-      ARS: { amount: input.priceArs, currency: "ARS" },
-      USD: { amount: input.priceUsd, currency: "USD" },
+      ARS: { amount: precioValido(input.priceArs), currency: "ARS" },
+      USD: { amount: precioValido(input.priceUsd), currency: "USD" },
     },
     currency: input.currency,
     platforms,
@@ -168,6 +204,11 @@ async function construir(
       input.licenseNote === null || input.licenseNote.trim() === ""
         ? null
         : input.licenseNote.trim(),
+    pricingType: input.pricingType,
+    acceptDonations: input.acceptDonations,
+    donationAlias: donationAlias === "" ? null : donationAlias,
+    donationQr: input.donationQr,
+    donationAliasFont: resolveDonationFont(input.donationAliasFont),
     published: input.published,
     featured: input.featured,
     sortOrder: Math.round(input.sortOrder),

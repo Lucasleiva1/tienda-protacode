@@ -1,12 +1,15 @@
 import {
   downloadLabel,
+  isFree,
   licenseLabel,
   platformsLabel,
 } from "@/features/products/format";
+import { pick, type Locale } from "@/i18n/shared";
 import type { Product } from "@/types/product";
 
 interface ProductRequirementsProps {
   readonly product: Product;
+  readonly locale: Locale;
 }
 
 /**
@@ -19,14 +22,19 @@ interface ProductRequirementsProps {
  * El `appId` existe en los datos pero no se muestra: es la llave interna con la que
  * se emiten las licencias y al comprador no le aporta nada.
  */
-export function ProductRequirements({ product }: ProductRequirementsProps) {
+export function ProductRequirements({ product, locale }: ProductRequirementsProps) {
   const tecnica = [
-    { label: "Programa", value: product.name },
-    { label: "Versión", value: product.version },
-    { label: "Sistema", value: platformsLabel(product.platforms) },
-    { label: "Licencia", value: licenseLabel(product.licenseType) },
-    { label: "Entrega", value: downloadLabel(product.downloadType) },
-    { label: "Modelo", value: "Pago único" },
+    { label: pick(locale, "Programa", "Program", "Programa"), value: product.name },
+    { label: pick(locale, "Versión", "Version", "Versão"), value: product.version },
+    { label: pick(locale, "Sistema", "System", "Sistema"), value: platformsLabel(product.platforms) },
+    { label: pick(locale, "Licencia", "License", "Licença"), value: licenseLabel(product.licenseType, locale) },
+    { label: pick(locale, "Entrega", "Delivery", "Entrega"), value: downloadLabel(product.downloadType, locale) },
+    {
+      label: pick(locale, "Modelo", "Payment model", "Modelo de pagamento"),
+      value: isFree(product)
+        ? pick(locale, "Gratis", "Free", "Grátis")
+        : pick(locale, "Pago único", "One-time payment", "Pagamento único"),
+    },
   ];
 
   return (
@@ -34,7 +42,7 @@ export function ProductRequirements({ product }: ProductRequirementsProps) {
       {product.systemRequirements.length > 0 ? (
         <section aria-labelledby="requisitos">
           <h2 id="requisitos" className="display text-3xl sm:text-4xl">
-            Requisitos
+            {pick(locale, "Requisitos", "Requirements", "Requisitos")}
           </h2>
           <Tabla filas={product.systemRequirements} />
         </section>
@@ -42,7 +50,7 @@ export function ProductRequirements({ product }: ProductRequirementsProps) {
 
       <section aria-labelledby="tecnica">
         <h2 id="tecnica" className="display text-3xl sm:text-4xl">
-          Información técnica
+          {pick(locale, "Información técnica", "Technical information", "Informações técnicas")}
         </h2>
         <Tabla filas={tecnica} />
       </section>

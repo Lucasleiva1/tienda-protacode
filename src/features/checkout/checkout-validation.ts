@@ -1,3 +1,4 @@
+import { pick, type Locale } from "@/i18n/shared";
 import type { OrderCustomer } from "@/types/order";
 
 /**
@@ -52,6 +53,7 @@ export interface CheckoutValidationError {
 
 export function validateCheckout(
   values: CheckoutFormValues,
+  locale: Locale = "es",
 ): CheckoutValidationOk | CheckoutValidationError {
   const errors: Record<string, string> = {};
 
@@ -61,31 +63,31 @@ export function validateCheckout(
   const confirmEmail = normalizarEmail(values.confirmEmail);
 
   if (firstName.length < MIN_NOMBRE) {
-    errors.firstName = "Escribí tu nombre.";
+    errors.firstName = pick(locale, "Escribí tu nombre.", "Enter your first name.", "Digite seu nome.");
   } else if (firstName.length > MAX_NOMBRE) {
-    errors.firstName = `El nombre no puede superar los ${MAX_NOMBRE} caracteres.`;
+    errors.firstName = pick(locale, `El nombre no puede superar los ${MAX_NOMBRE} caracteres.`, `First name cannot exceed ${MAX_NOMBRE} characters.`, `O nome não pode ter mais de ${MAX_NOMBRE} caracteres.`);
   }
 
   if (lastName.length < MIN_NOMBRE) {
-    errors.lastName = "Escribí tu apellido.";
+    errors.lastName = pick(locale, "Escribí tu apellido.", "Enter your last name.", "Digite seu sobrenome.");
   } else if (lastName.length > MAX_NOMBRE) {
-    errors.lastName = `El apellido no puede superar los ${MAX_NOMBRE} caracteres.`;
+    errors.lastName = pick(locale, `El apellido no puede superar los ${MAX_NOMBRE} caracteres.`, `Last name cannot exceed ${MAX_NOMBRE} characters.`, `O sobrenome não pode ter mais de ${MAX_NOMBRE} caracteres.`);
   }
 
   if (email === "") {
-    errors.email = "Escribí tu email.";
+    errors.email = pick(locale, "Escribí tu email.", "Enter your email.", "Digite seu e-mail.");
   } else if (email.length > MAX_EMAIL || !EMAIL.test(email)) {
-    errors.email = "Ese email no parece válido.";
+    errors.email = pick(locale, "Ese email no parece válido.", "That email does not look valid.", "Esse e-mail não parece válido.");
   }
 
   if (confirmEmail === "") {
-    errors.confirmEmail = "Repetí tu email.";
+    errors.confirmEmail = pick(locale, "Repetí tu email.", "Repeat your email.", "Repita seu e-mail.");
   } else if (errors.email === undefined && confirmEmail !== email) {
-    errors.confirmEmail = "Los dos emails no coinciden.";
+    errors.confirmEmail = pick(locale, "Los dos emails no coinciden.", "The two emails do not match.", "Os dois e-mails não coincidem.");
   }
 
   if (!values.acceptedTerms) {
-    errors.acceptedTerms = "Tenés que aceptar las condiciones para continuar.";
+    errors.acceptedTerms = pick(locale, "Tenés que aceptar las condiciones para continuar.", "You must accept the terms to continue.", "Você precisa aceitar as condições para continuar.");
   }
 
   if (Object.keys(errors).length > 0) {

@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { pick, type Locale } from "@/i18n/shared";
 import type { ProductImage } from "@/types/product";
 
 interface ProductGalleryProps {
   readonly images: readonly ProductImage[];
   readonly productName: string;
+  readonly locale: Locale;
 }
 
 /**
@@ -18,7 +20,7 @@ interface ProductGalleryProps {
  * Con una sola imagen no dibuja miniaturas, y sin imágenes no dibuja nada: no existe
  * el caso de una galería vacía con recuadros de relleno.
  */
-export function ProductGallery({ images, productName }: ProductGalleryProps) {
+export function ProductGallery({ images, productName, locale }: ProductGalleryProps) {
   const [activa, setActiva] = useState(0);
 
   if (images.length === 0) {
@@ -46,7 +48,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
       {images.length > 1 ? (
         <ul
           className="mt-3 flex flex-wrap gap-3"
-          aria-label={`Capturas de ${productName}`}
+          aria-label={`${pick(locale, "Capturas de", "Screenshots of", "Capturas de tela de")} ${productName}`}
         >
           {images.map((imagen, indice) => {
             const seleccionada = indice === activa;
@@ -72,7 +74,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                     className="h-16 w-24 object-cover"
                   />
                   <span className="sr-only">
-                    Ver captura {indice + 1} de {images.length}
+                    {pick(locale, "Ver captura", "View screenshot", "Ver captura")} {indice + 1} {pick(locale, "de", "of", "de")} {images.length}
                   </span>
                 </button>
               </li>

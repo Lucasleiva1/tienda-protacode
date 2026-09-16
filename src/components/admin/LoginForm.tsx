@@ -4,7 +4,13 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { loginAction, type LoginResult } from "@/features/admin/login-actions";
 
-export function LoginForm() {
+interface LoginFormProps {
+  /** Solo en desarrollo: credenciales de prueba precargadas. En producción llegan vacías. */
+  readonly devEmail?: string;
+  readonly devPassword?: string;
+}
+
+export function LoginForm({ devEmail, devPassword }: LoginFormProps = {}) {
   const [estado, accion] = useActionState<LoginResult, FormData>(
     loginAction,
     undefined,
@@ -22,6 +28,7 @@ export function LoginForm() {
           type="email"
           required
           maxLength={254}
+          defaultValue={devEmail}
           autoComplete="username"
           aria-invalid={estado !== undefined}
           aria-describedby={estado !== undefined ? "admin-error" : undefined}
@@ -39,6 +46,7 @@ export function LoginForm() {
           type="password"
           required
           maxLength={128}
+          defaultValue={devPassword}
           autoComplete="current-password"
           aria-invalid={estado !== undefined}
           aria-describedby={estado !== undefined ? "admin-error" : undefined}

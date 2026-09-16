@@ -1,15 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
+import { navigationLabel, pick, type Locale } from "@/i18n/shared";
 
-/*
-  Los legales todavía no tienen página. Se muestran como texto, no como enlace:
-  un enlace que lleva a un 404 es peor que una lista que anuncia lo que viene.
-*/
-const LEGALES = ["Términos", "Privacidad", "Licencia de software"] as const;
-
-export function Footer() {
-  const anio = new Date().getFullYear();
+export function Footer({ locale }: { readonly locale: Locale }) {
+  const year = new Date().getFullYear();
+  const legal = pick(
+    locale,
+    ["Términos", "Privacidad", "Licencia de software"],
+    ["Terms", "Privacy", "Software license"], ["Termos", "Privacidade", "Licença de software"],
+  );
 
   return (
     <footer className="border-t border-border">
@@ -30,14 +30,17 @@ export function Footer() {
               </span>
             </div>
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-muted">
-              Programas de escritorio con pago único. Comprás la versión disponible y
-              la usás de forma permanente.
+              {pick(
+                locale,
+                "Programas de escritorio con pago único. Comprás la versión disponible y la usás de forma permanente.",
+                "Desktop programs with a one-time payment. Buy the available version and use it permanently.", "Programas para computador com pagamento único. Você compra a versão disponível e a usa de forma permanente.",
+              )}
             </p>
           </div>
 
           <nav aria-labelledby="footer-navegacion">
             <h2 id="footer-navegacion" className="eyebrow">
-              Navegación
+              {pick(locale, "Navegación", "Navigation", "Navegação")}
             </h2>
             <ul className="mt-5 space-y-3">
               {siteConfig.navigation.map((item) => (
@@ -46,7 +49,7 @@ export function Footer() {
                     href={item.href}
                     className="text-sm text-muted transition-colors hover:text-foreground"
                   >
-                    {item.label}
+                    {navigationLabel(locale, item.label)}
                   </Link>
                 </li>
               ))}
@@ -54,12 +57,14 @@ export function Footer() {
           </nav>
 
           <div>
-            <h2 className="eyebrow">Legales</h2>
+            <h2 className="eyebrow">{pick(locale, "Legales", "Legal", "Legal")}</h2>
             <ul className="mt-5 space-y-3">
-              {LEGALES.map((legal) => (
-                <li key={legal} className="text-sm text-muted/70">
-                  {legal}
-                  <span className="sr-only"> — disponible próximamente</span>
+              {legal.map((item) => (
+                <li key={item} className="text-sm text-muted/70">
+                  {item}
+                  <span className="sr-only">
+                    {pick(locale, " — disponible próximamente", " — coming soon", " — disponível em breve")}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -67,8 +72,10 @@ export function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="eyebrow">© {anio} Prota Code</p>
-          <p className="eyebrow">Pago único · Sin suscripciones</p>
+          <p className="eyebrow">© {year} Prota Code</p>
+          <p className="eyebrow">
+            {pick(locale, "Pago único · Sin suscripciones", "One-time payment · No subscriptions", "Pagamento único · Sem assinaturas")}
+          </p>
         </div>
       </div>
     </footer>

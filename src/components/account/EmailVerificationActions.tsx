@@ -7,21 +7,22 @@ import {
   resendVerificationAction,
   type EmailVerificationState,
 } from "@/features/accounts/auth-actions";
+import { pick, type Locale } from "@/i18n/shared";
 
-export function ResendVerificationButton() {
+export function ResendVerificationButton({ locale }: { readonly locale: Locale }) {
   const [state, action] = useActionState<EmailVerificationState | undefined, FormData>(
     resendVerificationAction,
     undefined,
   );
   return (
     <form action={action} className="mt-5">
-      <SubmitButton idle="Reenviar email" pending="Enviando…" />
+      <SubmitButton idle={pick(locale, "Reenviar email", "Resend email", "Reenviar e-mail")} pending={pick(locale, "Enviando…", "Sending…", "Enviando…")} />
       {state ? <Feedback state={state} /> : null}
     </form>
   );
 }
 
-export function ConfirmEmailForm({ token }: { readonly token: string }) {
+export function ConfirmEmailForm({ token, locale }: { readonly token: string; readonly locale: Locale }) {
   const [state, action] = useActionState<EmailVerificationState | undefined, FormData>(
     confirmEmailAction,
     undefined,
@@ -30,10 +31,10 @@ export function ConfirmEmailForm({ token }: { readonly token: string }) {
     <form action={action}>
       <input type="hidden" name="token" value={token} />
       <p className="text-sm leading-relaxed text-muted">
-        Confirmá la dirección para habilitar las compras y proteger tu cuenta.
+        {pick(locale, "Confirmá la dirección para habilitar las compras y proteger tu cuenta.", "Confirm your address to enable purchases and protect your account.", "Confirme o endereço para liberar as compras e proteger sua conta.")}
       </p>
       <div className="mt-6">
-        <SubmitButton idle="Confirmar cuenta" pending="Confirmando…" />
+        <SubmitButton idle={pick(locale, "Confirmar cuenta", "Confirm account", "Confirmar conta")} pending={pick(locale, "Confirmando…", "Confirming…", "Confirmando…")} />
       </div>
       {state ? <Feedback state={state} /> : null}
     </form>

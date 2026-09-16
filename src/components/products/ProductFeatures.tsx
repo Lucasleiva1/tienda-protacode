@@ -1,8 +1,10 @@
+import { pick, type Locale } from "@/i18n/shared";
 import type { ProductFeature } from "@/types/product";
 
 interface ProductFeaturesProps {
   readonly features: readonly ProductFeature[];
   readonly useCases: readonly string[];
+  readonly locale: Locale;
 }
 
 /**
@@ -15,7 +17,7 @@ interface ProductFeaturesProps {
  * Cada bloque se dibuja solo si tiene datos. Un producto sin funciones cargadas no
  * muestra un encabezado vacío.
  */
-export function ProductFeatures({ features, useCases }: ProductFeaturesProps) {
+export function ProductFeatures({ features, useCases, locale }: ProductFeaturesProps) {
   if (features.length === 0 && useCases.length === 0) {
     return null;
   }
@@ -24,7 +26,7 @@ export function ProductFeatures({ features, useCases }: ProductFeaturesProps) {
     <div className="grid gap-12 lg:grid-cols-[1.6fr_1fr] lg:gap-16">
       {features.length > 0 ? (
         <div>
-          <h2 className="display text-3xl sm:text-4xl">Qué incluye</h2>
+          <h2 className="display text-3xl sm:text-4xl">{pick(locale, "Qué incluye", "What is included", "O que inclui")}</h2>
 
           <dl className="mt-8 border-t border-border">
             {features.map((funcion) => (
@@ -44,7 +46,7 @@ export function ProductFeatures({ features, useCases }: ProductFeaturesProps) {
 
       {useCases.length > 0 ? (
         <div>
-          <h2 className="display text-3xl sm:text-4xl">Para qué sirve</h2>
+          <h2 className="display text-3xl sm:text-4xl">{pick(locale, "Para qué sirve", "What it is for", "Para que serve")}</h2>
 
           <ul className="mt-8 flex flex-wrap gap-2">
             {useCases.map((caso) => (

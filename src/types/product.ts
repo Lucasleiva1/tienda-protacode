@@ -32,6 +32,16 @@ export interface Money {
  */
 export type PriceByCurrency = { readonly [C in Currency]: Money };
 
+/**
+ * Cómo se consigue el programa.
+ *
+ * "paid": se compra por el checkout de siempre.
+ * "free": se descarga desde su ficha, sin carrito, sin pago y sin pedido.
+ */
+export const PRICING_TYPES = ["paid", "free"] as const;
+
+export type PricingType = (typeof PRICING_TYPES)[number];
+
 export const PLATFORMS = ["windows", "macos", "linux"] as const;
 
 export type Platform = (typeof PLATFORMS)[number];
@@ -150,6 +160,36 @@ export interface Product {
    * El texto general vive en el componente de licencia, no repetido por producto.
    */
   readonly licenseNote: string | null;
+
+  /**
+   * Pago o gratuito.
+   *
+   * Los precios guardados no se borran cuando pasa a gratuito: quedan por si vuelve
+   * a venderse, pero no se muestran ni se cobran mientras sea "free".
+   */
+  readonly pricingType: PricingType;
+
+  /**
+   * Aportes voluntarios.
+   *
+   * NO son una compra: no van al carrito, no crean pedido, no emiten licencia y no
+   * habilitan nada. Es solo una forma de apoyar el proyecto.
+   */
+  readonly acceptDonations: boolean;
+
+  /** Alias para transferir. `null` si no se cargó. */
+  readonly donationAlias: string | null;
+
+  /** Imagen del QR de aportes. `null` si no se subió ninguna. */
+  readonly donationQr: ProductImage | null;
+
+  /**
+   * Tipografía con la que se muestra el alias.
+   *
+   * Es una clave de `DONATION_FONTS`, no una fuente arbitraria: así el alias no
+   * puede pedir una tipografía que el sitio no carga.
+   */
+  readonly donationAliasFont: string | null;
 
   /** Si es `false`, no debe aparecer nunca en la tienda publica. */
   readonly published: boolean;

@@ -1,26 +1,23 @@
 import { CartHydrator } from "@/features/cart/CartHydrator";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
+import { getLocale } from "@/i18n/server";
+import { pick } from "@/i18n/shared";
 
-/**
- * Envoltorio de la tienda pública.
- *
- * El header, el footer y el carrito viven acá y no en el layout raíz, para que el
- * Admin no los herede: es un panel de trabajo, no una página de la tienda.
- */
-export default function TiendaLayout({ children }: LayoutProps<"/">) {
+export default async function TiendaLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
   return (
     <>
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-foreground"
       >
-        Saltar al contenido
+        {pick(locale, "Saltar al contenido", "Skip to content", "Pular para o conteúdo")}
       </a>
       <CartHydrator />
-      <Header />
+      <Header locale={locale} />
       <div id="contenido">{children}</div>
-      <Footer />
+      <Footer locale={locale} />
     </>
   );
 }

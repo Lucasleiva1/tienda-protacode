@@ -1,16 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { pick, type Locale } from "@/i18n/shared";
 
-export function CopyLicenseButton({ licenseKey }: { readonly licenseKey: string }) {
+export function CopyLicenseButton({
+  licenseKey,
+  locale,
+}: {
+  readonly licenseKey: string;
+  readonly locale: Locale;
+}) {
   const [message, setMessage] = useState("");
 
   async function copy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(licenseKey);
-      setMessage("Licencia copiada.");
+      setMessage(pick(locale, "Licencia copiada.", "License copied.", "Licença copiada."));
     } catch {
-      setMessage("No pudimos copiarla automáticamente. Seleccioná la clave y copiala.");
+      setMessage(
+        pick(
+          locale,
+          "No pudimos copiarla automáticamente. Seleccioná la clave y copiala.",
+          "We could not copy it automatically. Select the key and copy it.",
+          "Não foi possível copiar automaticamente. Selecione a chave e copie.",
+        ),
+      );
     }
   }
 
@@ -21,7 +35,7 @@ export function CopyLicenseButton({ licenseKey }: { readonly licenseKey: string 
         onClick={copy}
         className="border border-accent px-4 py-2 text-xs font-semibold uppercase tracking-wider text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
-        Copiar licencia
+        {pick(locale, "Copiar licencia", "Copy license", "Copiar licença")}
       </button>
       <p aria-live="polite" className="text-xs text-muted">
         {message}

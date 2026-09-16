@@ -39,6 +39,25 @@ function ordenar(productos: readonly Product[]): readonly Product[] {
   );
 }
 
+/**
+ * Completa los campos nuevos en productos guardados antes de que existieran.
+ *
+ * Se arregla al leer y no se reescribe el almacén: un producto viejo se comporta
+ * exactamente como antes (pago, sin aportes) sin necesidad de migrar nada a mano.
+ */
+function normalizar<T extends Product | null>(producto: T): T {
+  if (producto === null) return producto;
+  const parcial = producto as Partial<Product>;
+  return {
+    ...producto,
+    pricingType: parcial.pricingType === "free" ? "free" : "paid",
+    acceptDonations: parcial.acceptDonations === true,
+    donationAlias: parcial.donationAlias ?? null,
+    donationQr: parcial.donationQr ?? null,
+    donationAliasFont: parcial.donationAliasFont ?? null,
+  } as T;
+}
+
 function createProductRepository(): ProductRepository {
   const store = getKeyValueStore(STORES.products);
 
@@ -47,7 +66,9 @@ function createProductRepository(): ProductRepository {
     const leidos = await Promise.all(
       claves.map((clave) => store.get<Product>(clave)),
     );
-    const productos = leidos.filter((p): p is Product => p !== null);
+    const productos = leidos
+      .filter((p): p is Product => p !== null)
+      .map((p) => normalizar(p));
     return ordenar(productos);
   }
 
@@ -62,7 +83,7 @@ function createProductRepository(): ProductRepository {
     },
 
     async findById(id) {
-      return store.get<Product>(id);
+      return normalizar(await store.get<Product>(id));
     },
 
     async findBySlug(slug) {

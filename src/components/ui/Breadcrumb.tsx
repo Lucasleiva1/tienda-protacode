@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pick, type Locale } from "@/i18n/shared";
 
 interface Paso {
   readonly label: string;
@@ -8,12 +9,13 @@ interface Paso {
 
 interface BreadcrumbProps {
   readonly items: readonly Paso[];
+  readonly locale?: Locale;
 }
 
 /** Navegación contextual. Discreta a propósito: ubica, no decora. */
-export function Breadcrumb({ items }: BreadcrumbProps) {
+export function Breadcrumb({ items, locale = "es" }: BreadcrumbProps) {
   return (
-    <nav aria-label="Ruta de navegación">
+    <nav aria-label={pick(locale, "Ruta de navegación", "Breadcrumb", "Trilha de navegação")}>
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((paso, indice) => {
           const ultimo = indice === items.length - 1;

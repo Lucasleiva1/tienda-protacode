@@ -1,8 +1,11 @@
 import { formatMoney } from "@/lib/utils/money";
+import { localizeProduct } from "@/i18n/product-copy";
+import { numberLocale, pick, type Locale } from "@/i18n/shared";
 import type { Money, Product } from "@/types/product";
 
 interface CheckoutSummaryProps {
   readonly products: readonly Product[];
+  readonly locale: Locale;
   readonly subtotal: Money;
 }
 
@@ -15,8 +18,8 @@ interface CheckoutSummaryProps {
  * No hay impuestos, envío ni cuotas porque no están definidos y son productos
  * digitales. Total = subtotal, sin renglones inventados.
  */
-export function CheckoutSummary({ products, subtotal }: CheckoutSummaryProps) {
-  const importe = formatMoney(subtotal);
+export function CheckoutSummary({ products, subtotal, locale }: CheckoutSummaryProps) {
+  const importe = formatMoney(subtotal, numberLocale(locale));
 
   return (
     <aside
@@ -27,7 +30,7 @@ export function CheckoutSummary({ products, subtotal }: CheckoutSummaryProps) {
 
       <div className="p-6 sm:p-7">
         <h2 id="resumen-checkout" className="eyebrow text-accent-contrast">
-          Tu compra
+          {pick(locale, "Tu compra", "Your purchase", "Sua compra")}
         </h2>
 
         <ul className="mt-6 border-t border-border">
@@ -37,11 +40,11 @@ export function CheckoutSummary({ products, subtotal }: CheckoutSummaryProps) {
               className="flex items-baseline justify-between gap-4 border-b border-border py-4"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold">{producto.name}</p>
-                <p className="eyebrow mt-1">versión {producto.version}</p>
+                <p className="truncate font-semibold">{localizeProduct(producto, locale).name}</p>
+                <p className="eyebrow mt-1">{pick(locale, "versión", "version", "versão")} {producto.version}</p>
               </div>
               <p className="shrink-0 text-sm">
-                {formatMoney(producto.price[subtotal.currency])}
+                {formatMoney(producto.price[subtotal.currency], numberLocale(locale))}
               </p>
             </li>
           ))}
@@ -60,7 +63,7 @@ export function CheckoutSummary({ products, subtotal }: CheckoutSummaryProps) {
         </dl>
 
         <ul className="mt-5 flex flex-wrap gap-2">
-          {["Pago único", "Sin suscripción"].map((sello) => (
+          {[pick(locale, "Pago único", "One-time payment", "Pagamento único"), pick(locale, "Sin suscripción", "No subscription", "Sem assinatura")].map((sello) => (
             <li
               key={sello}
               className="eyebrow border border-accent/40 px-3 py-1.5 text-accent-contrast"

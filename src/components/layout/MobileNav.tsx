@@ -3,20 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CloseIcon, MenuIcon } from "@/components/ui/Icons";
+import { pick, type Locale } from "@/i18n/shared";
 import type { NavItem } from "@/config/site";
 
 interface MobileNavProps {
   readonly items: readonly NavItem[];
+  readonly locale: Locale;
 }
 
-/**
- * Menú de navegación en pantallas chicas.
- *
- * Es lo único de la Home que necesita JavaScript, y por una razón concreta: el panel
- * tiene que cerrarse solo cuando se toca un enlace. Con `<details>` quedaría abierto
- * después de saltar a la sección.
- */
-export function MobileNav({ items }: MobileNavProps) {
+export function MobileNav({ items, locale }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -28,18 +23,16 @@ export function MobileNav({ items }: MobileNavProps) {
         aria-controls="menu-movil"
         className="flex h-10 w-10 items-center justify-center border border-border text-muted transition-colors hover:border-accent-contrast/60 hover:text-foreground"
       >
-        {open ? (
-          <CloseIcon className="h-5 w-5" />
-        ) : (
-          <MenuIcon className="h-5 w-5" />
-        )}
-        <span className="sr-only">{open ? "Cerrar menú" : "Abrir menú"}</span>
+        {open ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+        <span className="sr-only">
+          {open ? pick(locale, "Cerrar menú", "Close menu", "Fechar menu") : pick(locale, "Abrir menú", "Open menu", "Abrir menu")}
+        </span>
       </button>
 
       {open ? (
         <nav
           id="menu-movil"
-          aria-label="Principal"
+          aria-label={pick(locale, "Principal", "Main", "Principal")}
           className="absolute inset-x-0 top-16 border-b border-border bg-background"
         >
           <ul className="mx-auto max-w-[1400px] px-4 py-2 sm:px-6">

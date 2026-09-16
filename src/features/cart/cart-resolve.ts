@@ -38,6 +38,16 @@ export function resolveCart(
       missing.push(slug);
       continue;
     }
+
+    /*
+      Un programa gratuito no se compra: se descarga desde su ficha. Si quedó uno
+      guardado en el carrito (porque era pago y después pasó a gratuito), sale por
+      `missing` y la vista lo limpia sola, igual que un programa despublicado.
+    */
+    if (producto.pricingType === "free") {
+      missing.push(slug);
+      continue;
+    }
     products.push(producto);
   }
 

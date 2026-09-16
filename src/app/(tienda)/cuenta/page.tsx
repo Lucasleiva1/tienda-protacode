@@ -4,8 +4,13 @@ import { logoutCustomerAction } from "@/features/accounts/auth-actions";
 import { getCurrentCustomerProfile } from "@/features/accounts/customer-session";
 import { ResendVerificationButton } from "@/components/account/EmailVerificationActions";
 import { safeNextPath } from "@/features/accounts/auth-utils";
+import { getLocale } from "@/i18n/server";
+import { pick, type Locale } from "@/i18n/shared";
 
-export const metadata = { title: "Mi cuenta", robots: { index: false } };
+export async function generateMetadata() {
+  const locale = await getLocale();
+  return { title: pick(locale, "Mi cuenta", "My account", "Minha conta"), robots: { index: false } };
+}
 
 export default async function AccountPage({
   searchParams,
@@ -13,45 +18,58 @@ export default async function AccountPage({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const locale = await getLocale();
   const customer = await getCurrentCustomerProfile();
   if (customer === null) redirect("/cuenta/iniciar-sesion");
   const verification = typeof params.verificacion === "string" ? params.verificacion : null;
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
 
   return (
-    <AccountShell eyebrow="Cuenta de cliente" title={`Hola, ${customer.firstName}`}>
+    <AccountShell
+      locale={locale}
+      eyebrow={pick(locale, "Cuenta de cliente", "Customer account", "Conta de cliente")}
+      title={pick(locale, "Hola, ", "Hi, ", "Olá, ") + customer.firstName}
+    >
       {verification !== null ? (
-        <VerificationNotice status={verification} next={next} />
+        <VerificationNotice status={verification} next={next} locale={locale} />
       ) : null}
       <dl className="border-t border-border">
-        <Row label="Nombre" value={`${customer.firstName} ${customer.lastName}`} />
-        <Row label="Email" value={customer.email} />
-        <Row label="Estado del email" value={customer.emailVerified ? "Confirmado" : "Pendiente"} />
-        <Row label="Ingreso con Google" value={customer.hasGoogle ? "Vinculado" : "No vinculado"} />
-        <Row label="Contraseña" value={customer.hasPassword ? "Configurada" : "Ingreso con Google"} />
+        <Row label={pick(locale, "Nombre", "Name", "Nome")} value={`${customer.firstName} ${customer.lastName}`} />
+        <Row label={pick(locale, "Email", "Email", "E-mail")} value={customer.email} />
+        <Row label={pick(locale, "Estado del email", "Email status", "Status do e-mail")} value={customer.emailVerified ? pick(locale, "Confirmado", "Confirmed", "Confirmado") : pick(locale, "Pendiente", "Pending", "Pendente")} />
+        <Row label={pick(locale, "Ingreso con Google", "Google sign-in", "Login com Google")} value={customer.hasGoogle ? pick(locale, "Vinculado", "Linked", "Vinculado") : pick(locale, "No vinculado", "Not linked", "Não vinculado")} />
+        <Row label={pick(locale, "Contraseña", "Password", "Senha")} value={customer.hasPassword ? pick(locale, "Configurada", "Set", "Configurada") : pick(locale, "Ingreso con Google", "Google sign-in", "Login com Google")} />
       </dl>
-      {!customer.emailVerified ? <ResendVerificationButton /> : null}
+      {!customer.emailVerified ? <ResendVerificationButton locale={locale} /> : null}
       <form action={logoutCustomerAction} className="mt-8">
         <button className="border border-border px-5 py-3 text-sm font-semibold uppercase tracking-wider hover:border-accent">
-          Cerrar sesión
+          {pick(locale, "Cerrar sesión", "Sign out", "Sair")}
         </button>
       </form>
     </AccountShell>
   );
 }
 
-function VerificationNotice({ status, next }: { readonly status: string; readonly next: string }) {
+function VerificationNotice({
+  status,
+  next,
+  locale,
+}: {
+  readonly status: string;
+  readonly next: string;
+  readonly locale: Locale;
+}) {
   const messages: Record<string, string> = {
-    enviada: "Te enviamos el enlace de confirmación. Revisá también correo no deseado.",
-    "no-enviada": "La cuenta fue creada, pero el envío de email todavía no está configurado.",
-    requerida: "Confirmá tu email antes de continuar con la compra.",
-    confirmada: "Tu email quedó confirmado. Ya podés comprar.",
+    enviada: pick(locale, "Te enviamos el enlace de confirmación. Revisá también correo no deseado.", "We sent you the confirmation link. Check your spam folder too.", "Enviamos o link de confirmação. Verifique também a caixa de spam."),
+    "no-enviada": pick(locale, "La cuenta fue creada, pero el envío de email todavía no está configurado.", "Your account was created, but email sending is not configured yet.", "A conta foi criada, mas o envio de e-mails ainda não está configurado."),
+    requerida: pick(locale, "Confirmá tu email antes de continuar con la compra.", "Confirm your email before continuing with your purchase.", "Confirme seu e-mail antes de continuar com a compra."),
+    confirmada: pick(locale, "Tu email quedó confirmado. Ya podés comprar.", "Your email is confirmed. You can now buy.", "Seu e-mail foi confirmado. Você já pode comprar."),
   };
   const message = messages[status];
   if (message === undefined) return null;
   return (
     <p className="mb-6 border border-accent/50 bg-accent/10 px-4 py-3 text-sm">
-      {message}{status === "confirmada" && next === "/checkout" ? " Volvé al carrito para continuar." : ""}
+      {message}{status === "confirmada" && next === "/checkout" ? pick(locale, " Volvé al carrito para continuar.", " Go back to your cart to continue.", " Volte ao carrinho para continuar.") : ""}
     </p>
   );
 }

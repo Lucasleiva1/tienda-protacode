@@ -23,7 +23,8 @@ export type CreateOrderProblem =
   | "empty_cart"
   | "product_unavailable"
   | "mixed_currencies"
-  | "too_many_items";
+  | "too_many_items"
+  | "free_product";
 
 export type CreateOrderResult =
   | { readonly ok: true; readonly order: Order; readonly purchaseToken: string }
@@ -46,6 +47,8 @@ const MENSAJES: Record<CreateOrderProblem, string> = {
   mixed_currencies:
     "Los productos del carrito utilizan monedas diferentes. Dejá programas de una sola moneda para poder continuar.",
   too_many_items: "Hay demasiados programas en el carrito.",
+  free_product:
+    "Uno de los programas de tu carrito es gratuito y se descarga desde su ficha, sin pasar por el pago.",
 };
 
 function fallo(problem: CreateOrderProblem): CreateOrderResult {
@@ -91,6 +94,8 @@ export async function createPendingOrder(
   for (const slug of slugs) {
     const producto = await getProductBySlug(slug);
     if (producto === undefined) return fallo("product_unavailable");
+    // Un gratuito nunca genera pedido, ni siquiera si alguien fuerza el slug.
+    if (producto.pricingType === "free") return fallo("free_product");
     productos.push(producto);
   }
 

@@ -10,6 +10,18 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Credenciales de prueba precargadas, solo con `next dev`.
+ * En producción NODE_ENV nunca es "development", así que el formulario sale vacío.
+ */
+function devCredentials(): { devEmail?: string; devPassword?: string } {
+  if (process.env.NODE_ENV !== "development") return {};
+  return {
+    devEmail: process.env.ADMIN_DEV_EMAIL,
+    devPassword: process.env.ADMIN_DEV_PASSWORD,
+  };
+}
+
 export default async function LoginPage() {
   // Con sesión abierta no tiene sentido mostrar el login.
   if (await hasValidSession()) {
@@ -28,7 +40,7 @@ export default async function LoginPage() {
         <div className="mt-8 border border-border bg-surface">
           <div aria-hidden="true" className="h-px bg-accent/70" />
           <div className="p-6">
-            <LoginForm />
+            <LoginForm {...devCredentials()} />
           </div>
         </div>
       </div>
