@@ -22,6 +22,13 @@ const googleReferrerPolicy =
     : "strict-origin-when-cross-origin";
 
 const nextConfig: NextConfig = {
+  /*
+    `.data` es el almacén local de desarrollo: pedidos, clientes e instaladores de
+    prueba. Nunca debe viajar dentro del paquete que se publica.
+  */
+  outputFileTracingExcludes: {
+    "**/*": [".data/**"],
+  },
   experimental: {
     serverActions: {
       // La foto del producto y los comprobantes viajan por Server Actions: 3 MB de

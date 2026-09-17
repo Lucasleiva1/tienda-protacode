@@ -31,9 +31,23 @@ export interface KeyValueStore {
   keys(): Promise<string[]>;
 }
 
-/** `true` cuando el proceso corre dentro de Netlify. */
+/**
+ * `true` cuando el proceso corre dentro de Netlify.
+ *
+ * `STORAGE_ENGINE` manda sobre la detección automática. Hace falta porque la
+ * Function que sirve la tienda publicada no siempre recibe `NETLIFY`: sin esta
+ * variable, el sitio publicado se caía al almacén de archivos y mostraba datos
+ * que no correspondían.
+ */
 export function isNetlifyRuntime(): boolean {
-  return process.env.NETLIFY === "true" || process.env.NETLIFY === "1";
+  const elegido = process.env.STORAGE_ENGINE?.trim().toLowerCase();
+  if (elegido === "netlify-blobs") return true;
+  if (elegido === "files") return false;
+  return (
+    process.env.NETLIFY === "true" ||
+    process.env.NETLIFY === "1" ||
+    process.env.NETLIFY_BLOBS_CONTEXT !== undefined
+  );
 }
 
 /* ------------------------- motor: Netlify Blobs ------------------------- */
