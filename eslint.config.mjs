@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Paquete que arma el CLI de Netlify al publicar: código generado, no se revisa.
+    ".netlify/**",
   ]),
 ]);
 

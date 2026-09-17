@@ -46,3 +46,6 @@ next-env.d.ts
 
 # ajustes locales de Claude Code (permisos de esta máquina)
 .claude/settings.local.json
+
+# Carpeta de trabajo del CLI de Netlify (paquete de publicacion local)
+/.netlify
