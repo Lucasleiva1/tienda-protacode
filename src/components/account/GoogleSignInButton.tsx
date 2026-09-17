@@ -161,13 +161,15 @@ export function GoogleSignInButton({ next, locale, fallbackHref }: GoogleSignInB
   return (
     <div className="w-full">
       <div
-        ref={container}
         aria-busy={status === "loading" || status === "working"}
         className={`flex min-h-11 w-full items-center justify-center ${status === "working" ? "pointer-events-none opacity-60" : ""}`}
       >
         {status === "loading" ? (
           <span className="text-xs text-muted">{t("Cargando Google…", "Loading Google…", "Carregando Google…")}</span>
         ) : null}
+        {/* Google dibuja el botón acá adentro: React no le pone hijos a este div. */}
+        {/* color-scheme light: sin esto el iframe de Google pinta un fondo blanco en páginas oscuras. */}
+        <div ref={container} className="flex w-full justify-center [color-scheme:light] empty:hidden" />
       </div>
 
       {status === "working" ? (

@@ -47,6 +47,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
       className={[barlow.variable, barlowCondensed.variable].join(" ")}
     >
+      <head>
+        {/* La tienda ya es oscura: le pide a Dark Reader que no la modifique (evita el error de hidratación). */}
+        <meta name="darkreader-lock" />
+      </head>
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
         {children}
       </body>
