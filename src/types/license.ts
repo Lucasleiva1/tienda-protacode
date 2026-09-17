@@ -40,6 +40,15 @@ export interface IssueLicenseInput {
    * checkout reintenta por un corte de red o un doble clic.
    */
   readonly idempotencyKey: string;
+
+  /** Producto de la tienda. Lo usan los proveedores que asignan por producto. */
+  readonly productId?: string;
+
+  /** Referencia legible del pedido (PC-1051). */
+  readonly orderReference?: string | null;
+
+  /** Cuenta interna del comprador; `null` en compras como invitado. */
+  readonly customerId?: string | null;
 }
 
 export interface IssuedLicense {
@@ -48,7 +57,33 @@ export interface IssuedLicense {
   readonly status: LicenseStatus;
   readonly issuedAt: string;
   readonly replayed: boolean;
+  /** Identificador de la licencia en el sistema externo, si lo informa. */
+  readonly licenseId?: string | null;
 }
+
+/** Consulta de una licencia ya asignada, sin pedir una nueva. */
+export interface LicenseLookupInput {
+  readonly appId: string;
+  readonly orderId: string;
+  readonly orderReference: string | null;
+  readonly productId: string;
+  /** Misma clave estable con la que se asignó. */
+  readonly idempotencyKey: string;
+}
+
+export type LicenseLookupResult =
+  | { readonly ok: true; readonly found: false }
+  | { readonly ok: true; readonly found: true; readonly license: IssuedLicense }
+  | { readonly ok: false; readonly error: LicenseErrorCode; readonly message: string };
+
+export interface LicenseValidationInput {
+  readonly appId: string;
+  readonly licenseKey: string;
+}
+
+export type LicenseValidationResult =
+  | { readonly ok: true; readonly valid: boolean; readonly status: LicenseStatus | null }
+  | { readonly ok: false; readonly error: LicenseErrorCode; readonly message: string };
 
 export type LicenseErrorCode =
   | "RXW_CORE_NOT_CONFIGURED"
@@ -65,7 +100,12 @@ export type LicenseErrorCode =
   | "UNAUTHORIZED_SERVICE"
   | "INVALID_SERVICE"
   | "RATE_LIMITED"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "LICENSE_API_INVALID_CONFIGURATION"
+  | "LICENSE_API_UNAVAILABLE"
+  | "LICENSE_API_INVALID_RESPONSE"
+  | "LICENSE_NOT_FOUND"
+  | "OPERATION_NOT_SUPPORTED";
 
 /**
  * Resultado de emitir una licencia.

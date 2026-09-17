@@ -1,7 +1,7 @@
 import "server-only";
 import { normalizeOrder } from "@/features/orders/order-normalization";
 import type { OrderRepository } from "@/features/orders/order-repository";
-import { getKeyValueStore, STORES } from "@/lib/storage/store";
+import { getKeyValueStore, STORES, type KeyValueStore } from "@/lib/storage/store";
 import type { Order } from "@/types/order";
 
 /**
@@ -13,9 +13,9 @@ import type { Order } from "@/types/order";
  *
  * Un pedido por clave, igual que los productos.
  */
-function createPersistentOrderRepository(): OrderRepository {
-  const store = getKeyValueStore(STORES.orders);
-
+export function createPersistentOrderRepository(
+  store: KeyValueStore = getKeyValueStore(STORES.orders),
+): OrderRepository {
   return {
     name: `OrderRepository (${store.engine})`,
 
@@ -39,10 +39,11 @@ function createPersistentOrderRepository(): OrderRepository {
       for (let attempt = 0; attempt < 8; attempt += 1) {
         const current = await store.getWithVersion<Order>(id);
         if (current === null) return null;
-        const next = {
-          ...updater(normalizeOrder(current.value)),
-          updatedAt: new Date().toISOString(),
-        };
+        const normalized = normalizeOrder(current.value);
+        const updated = updater(normalized);
+        // El actualizador devolvió el mismo objeto: no hay nada que escribir.
+        if (updated === normalized) return normalized;
+        const next = { ...updated, updatedAt: new Date().toISOString() };
         if (await store.setIfVersion(id, next, current.version)) return next;
       }
       throw new Error("ORDER_CONCURRENT_UPDATE_RETRY_EXHAUSTED");
@@ -60,6 +61,16 @@ export async function findAllOrders(): Promise<readonly Order[]> {
     .filter((o): o is Order => o !== null)
     .map(normalizeOrder)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Pedidos de una cuenta. El filtro es server-side y exacto por `accountId`: nunca
+ * por datos que mande el navegador.
+ */
+export async function findOrdersByAccount(accountId: string): Promise<readonly Order[]> {
+  if (accountId.trim() === "") return [];
+  const todos = await findAllOrders();
+  return todos.filter((order) => order.customer.accountId === accountId);
 }
 
 let repositorio: OrderRepository | null = null;

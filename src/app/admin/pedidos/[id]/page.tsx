@@ -1,22 +1,32 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { OrderDeliveryActions } from "@/components/admin/OrderDeliveryActions";
+import { PaymentReviewActions } from "@/components/admin/PaymentReviewActions";
 import { RevealLicenseButton } from "@/components/admin/RevealLicenseButton";
+import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { requireAdminPage } from "@/features/admin/guard";
+import {
+  ADMIN_FULFILLMENT_LABEL,
+  ADMIN_LICENSE_LABEL,
+  ADMIN_MANUAL_PAYMENT_LABEL,
+  ADMIN_STAGE_LABEL,
+} from "@/features/admin/order-labels";
+import { createLicenseService } from "@/features/licensing/license-service";
+import { orderDisplayReference, orderProductSummary } from "@/features/orders/order-display";
 import { findOrder } from "@/features/orders/order-service";
+import {
+  acceptsAdminReview,
+  getOrderStage,
+  isItemDownloadEnabled,
+  licenseDeliveryState,
+} from "@/features/payments/manual-payment-state";
 import { findPaymentByOrderId } from "@/features/payments/payment-service";
+import { getPaymentMethodSettings } from "@/features/settings/payment-method-settings";
+import { getEmailConfiguration } from "@/lib/email/mailer";
 import { formatMoney } from "@/lib/utils/money";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedido" };
-
-const ORDER_LABEL: Record<string, string> = {
-  pending: "Pendiente de pago",
-  paid: "Pagado",
-  failed: "Fallido",
-  cancelled: "Cancelado",
-  fulfilled: "Entregado",
-};
 
 const PAGO_LABEL: Record<string, string> = {
   not_started: "Sin iniciar",
@@ -28,148 +38,216 @@ const PAGO_LABEL: Record<string, string> = {
   error: "Error",
 };
 
-const LICENCIA_LABEL: Record<string, string> = {
-  not_requested: "No solicitada",
-  pending: "Pendiente",
-  issued: "Emitida",
-  failed: "Falló",
-};
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
-const FULFILLMENT_LABEL: Record<string, string> = {
-  not_started: "Sin iniciar",
-  pending: "Procesando",
-  partial: "Parcial",
-  failed: "Requiere reintento",
-  fulfilled: "Completado",
-};
+function fecha(value: string | null | undefined): string {
+  return value === null || value === undefined
+    ? "—"
+    : new Date(value).toLocaleString("es-AR", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "America/Argentina/Buenos_Aires",
+      });
+}
 
 /**
  * Ficha de un pedido.
  *
- * No existe botón para marcar como pagado. El estado de pago solo puede cambiarlo
- * un proveedor real, verificado por el servidor: si se pudiera marcar a mano, un
- * error de clic entregaría una licencia sin cobrar.
+ * "Confirmar pago" existe solo para pagos manuales y corre en el servidor con
+ * sesión de Admin. Los pagos de pasarela se siguen aprobando únicamente por un
+ * evento verificado del proveedor.
  */
 export default async function AdminPedidoPage({
   params,
 }: PageProps<"/admin/pedidos/[id]">) {
-  await requireAdminPage();
-
   const { id } = await params;
-  const pedido = await findOrder(id);
+  const referencia = safeDecode(id);
+  await requireAdminPage(`/admin/pedidos/${encodeURIComponent(referencia)}`);
 
+  const pedido = await findOrder(referencia);
   if (pedido === null) notFound();
-  const payment = await findPaymentByOrderId(pedido.id);
+
+  const [payment, metodos] = await Promise.all([
+    findPaymentByOrderId(pedido.id),
+    getPaymentMethodSettings(),
+  ]);
+  const licencias = createLicenseService().summary();
+  const email = getEmailConfiguration();
+  const stage = getOrderStage(pedido);
+  const manual = pedido.manualPayment;
+  const ref = orderDisplayReference(pedido);
+  const metodo = manual?.method === null || manual === null ? null : metodos.find((m) => m.id === manual.method) ?? null;
+  const revisable = acceptsAdminReview(pedido);
+  const whatsapp = pedido.customer.whatsapp ?? null;
+  const proofUrl = manual?.proof !== null && manual !== null ? `/api/admin/comprobantes/${encodeURIComponent(pedido.id)}` : null;
+  const proofIsImage = manual?.proof?.contentType.startsWith("image/") ?? false;
 
   return (
-    <main className="mx-auto w-full max-w-[1100px] px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-10">
       <Breadcrumb
         items={[
           { label: "Admin", href: "/admin" },
           { label: "Pedidos", href: "/admin/pedidos" },
-          { label: pedido.id.slice(0, 8).toUpperCase() },
+          { label: ref },
         ]}
       />
 
-      <h1 className="display mt-6 text-4xl">
-        Pedido {pedido.id.slice(0, 8).toUpperCase()}
-      </h1>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <h1 className="display text-3xl sm:text-4xl">Pedido {ref}</h1>
+        <span
+          className={`eyebrow border px-3 py-1.5 ${
+            stage === "awaiting_verification"
+              ? "border-accent bg-accent/15 text-accent-contrast"
+              : stage === "paid" || stage === "rejected"
+                ? "border-danger/60 text-danger"
+                : "border-border text-foreground"
+          }`}
+        >
+          {ADMIN_STAGE_LABEL[stage]}
+        </span>
+      </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      {revisable && manual !== null ? (
+        <section
+          aria-labelledby="verificar"
+          className="mt-6 border border-accent/60 bg-accent/10 p-4 sm:p-6"
+        >
+          <h2 id="verificar" className="eyebrow text-accent-contrast">
+            Verificación de pago
+          </h2>
+          <p className="display mt-2 text-4xl sm:text-5xl">{formatMoney(pedido.total)}</p>
+          <p className="mt-1 text-sm text-muted">{orderProductSummary(pedido)}</p>
+
+          <dl className="mt-4 grid gap-px border border-border bg-border sm:grid-cols-2">
+            <Dato etiqueta="Método" valor={manual.methodLabel ?? "El cliente no eligió medio"} />
+            <Dato
+              etiqueta="Informado"
+              valor={manual.reportedAt === null ? "El cliente todavía no tocó «Ya pagué»" : fecha(manual.reportedAt)}
+            />
+            {metodo !== null && metodo.alias !== null ? <Dato etiqueta="Alias donde debe entrar" valor={metodo.alias} /> : null}
+            {metodo !== null && metodo.cvu !== null ? <Dato etiqueta="CVU/CBU" valor={metodo.cvu} /> : null}
+          </dl>
+
+          <div className="mt-4">
+            <p className="eyebrow">Comprobante</p>
+            {proofUrl === null ? (
+              <p className="mt-1 text-sm text-muted">No adjuntó comprobante.</p>
+            ) : proofIsImage ? (
+              <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                <Image
+                  src={proofUrl}
+                  alt={`Comprobante del pedido ${ref}`}
+                  width={480}
+                  height={640}
+                  unoptimized
+                  className="h-auto max-h-96 w-auto max-w-full border border-border bg-background object-contain"
+                />
+                <span className="mt-1 block text-xs text-muted underline">Abrir en tamaño completo</span>
+              </a>
+            ) : (
+              <a
+                href={proofUrl}
+                className="mt-2 inline-flex min-h-11 items-center border border-border px-4 text-xs font-semibold uppercase tracking-wider hover:border-accent"
+              >
+                Descargar comprobante PDF
+              </a>
+            )}
+            <p className="mt-2 text-xs text-muted">
+              El comprobante es solo una ayuda: confirmá únicamente después de ver el ingreso en tu cuenta.
+            </p>
+          </div>
+
+          <div className="mt-6">
+            <PaymentReviewActions
+              orderId={pedido.id}
+              reference={ref}
+              product={orderProductSummary(pedido)}
+              amount={formatMoney(pedido.total)}
+              method={manual.methodLabel ?? "Sin informar"}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel titulo="Pedido">
-          <Fila etiqueta="Identificador" valor={pedido.id} />
-          <Fila
-            etiqueta="Creado"
-            valor={new Date(pedido.createdAt).toLocaleString("es-AR")}
-          />
-          <Fila
-            etiqueta="Actualizado"
-            valor={new Date(pedido.updatedAt).toLocaleString("es-AR")}
-          />
-          <Fila
-            etiqueta="Estado"
-            valor={ORDER_LABEL[pedido.status] ?? pedido.status}
-          />
+          <Fila etiqueta="Número" valor={ref} />
+          <Fila etiqueta="Identificador interno" valor={pedido.id} />
+          <Fila etiqueta="Creado" valor={fecha(pedido.createdAt)} />
+          <Fila etiqueta="Actualizado" valor={fecha(pedido.updatedAt)} />
+          <Fila etiqueta="Estado" valor={ADMIN_STAGE_LABEL[stage]} />
+          <Fila etiqueta="Tipo de compra" valor={pedido.customer.accountId ? "Con cuenta" : "Invitado"} />
         </Panel>
 
         <Panel titulo="Cliente">
-          <Fila etiqueta="Nombre" valor={pedido.customer.firstName} />
-          <Fila etiqueta="Apellido" valor={pedido.customer.lastName} />
-          <Fila etiqueta="Email" valor={pedido.customer.email} />
+          <Fila etiqueta="Nombre" valor={`${pedido.customer.firstName} ${pedido.customer.lastName}`} />
+          <FilaEnlace etiqueta="Email" valor={pedido.customer.email} href={`mailto:${pedido.customer.email}`} />
+          {whatsapp !== null ? (
+            <FilaEnlace etiqueta="WhatsApp" valor={`+${whatsapp}`} href={`https://wa.me/${whatsapp}`} externo />
+          ) : (
+            <Fila etiqueta="WhatsApp" valor="No informado" />
+          )}
         </Panel>
 
         <Panel titulo="Pago">
+          <Fila etiqueta="Total" valor={formatMoney(pedido.total)} />
           <Fila
-            etiqueta="Estado"
-            valor={PAGO_LABEL[payment?.status ?? pedido.payment.status] ?? (payment?.status ?? pedido.payment.status)}
+            etiqueta="Método"
+            valor={pedido.payment.provider === "free" ? "Gratis" : manual?.methodLabel ?? pedido.payment.provider ?? "—"}
           />
+          {manual !== null ? (
+            <>
+              <Fila etiqueta="Estado del pago" valor={ADMIN_MANUAL_PAYMENT_LABEL[manual.status]} />
+              <Fila etiqueta="Informado (Ya pagué)" valor={fecha(manual.reportedAt)} />
+              <Fila etiqueta="Pagado" valor={fecha(manual.paidAt)} />
+              <Fila etiqueta="Aprobado por" valor={manual.approvedBy ?? "—"} />
+              {manual.status === "rejected" ? (
+                <>
+                  <Fila etiqueta="Rechazado" valor={`${fecha(manual.rejectedAt)} · ${manual.rejectedBy ?? ""}`} />
+                  <Fila etiqueta="Motivo" valor={manual.rejectionReason ?? "—"} />
+                </>
+              ) : null}
+            </>
+          ) : (
+            <Fila etiqueta="Estado del pago" valor={PAGO_LABEL[pedido.payment.status] ?? pedido.payment.status} />
+          )}
           <Fila
-            etiqueta="Proveedor"
-            valor={payment?.provider ?? pedido.payment.provider ?? "No configurado"}
+            etiqueta="Registro técnico"
+            valor={payment === null ? "Sin registro" : `${PAGO_LABEL[payment.status] ?? payment.status} · ${payment.provider}`}
           />
-          <Fila
-            etiqueta="External payment ID"
-            valor={payment?.externalPaymentId ?? pedido.payment.providerReference ?? "—"}
-          />
-          <Fila
-            etiqueta="Importe"
-            valor={payment === null ? "—" : formatMoney(payment.amount)}
-          />
-          <Fila etiqueta="Moneda" valor={payment?.amount.currency ?? pedido.currency} />
-          <Fila
-            etiqueta="Creado"
-            valor={payment === null ? "—" : new Date(payment.createdAt).toLocaleString("es-AR")}
-          />
-          <Fila
-            etiqueta="Aprobado"
-            valor={payment?.approvedAt === null || payment === null
-              ? "—"
-              : new Date(payment.approvedAt).toLocaleString("es-AR")}
-          />
-          {payment?.failureReason !== null && payment?.failureReason !== undefined ? (
-            <Fila etiqueta="Motivo técnico" valor={payment.failureReason} />
-          ) : null}
         </Panel>
 
-        <Panel titulo="Fulfillment">
-          <Fila
-            etiqueta="Estado"
-            valor={FULFILLMENT_LABEL[pedido.fulfillment.status] ?? pedido.fulfillment.status}
-          />
-          <Fila
-            etiqueta="Licencias"
-            valor={LICENCIA_LABEL[pedido.licenseStatus] ?? pedido.licenseStatus}
-          />
-          <Fila
-            etiqueta="Último intento"
-            valor={pedido.fulfillment.lastAttemptAt === null
-              ? "—"
-              : new Date(pedido.fulfillment.lastAttemptAt).toLocaleString("es-AR")}
-          />
-          <Fila
-            etiqueta="Completado"
-            valor={pedido.fulfillment.completedAt === null
-              ? "—"
-              : new Date(pedido.fulfillment.completedAt).toLocaleString("es-AR")}
-          />
-          <Fila etiqueta="Último estado técnico" valor={pedido.fulfillment.lastError ?? "—"} />
+        <Panel titulo="Licencias y entrega">
+          <Fila etiqueta="Sistema de licencias" valor={`${licencias.activeProvider ?? "ninguno"} (${licencias.implementation})`} />
+          <Fila etiqueta="Licencias" valor={ADMIN_LICENSE_LABEL[licenseDeliveryState(pedido.licenseStatus)]} />
+          <Fila etiqueta="Asignadas" valor={fecha(pedido.fulfillment.licenseAssignedAt)} />
+          <Fila etiqueta="Entrega" valor={ADMIN_FULFILLMENT_LABEL[pedido.fulfillment.status]} />
+          <Fila etiqueta="Último intento" valor={fecha(pedido.fulfillment.lastAttemptAt)} />
+          <Fila etiqueta="Completada" valor={fecha(pedido.fulfillment.completedAt)} />
+          <Fila etiqueta="Último error" valor={pedido.fulfillment.lastError ?? "—"} />
+          <Fila etiqueta="Email al cliente" valor={pedido.notifications.deliveryReadyEmailAt !== null ? `Enviado ${fecha(pedido.notifications.deliveryReadyEmailAt)}` : email.ready ? "Todavía no" : "SMTP sin configurar"} />
         </Panel>
       </div>
 
-      <section aria-labelledby="items" className="mt-10">
+      <section aria-labelledby="items" className="mt-8">
         <h2 id="items" className="eyebrow text-accent-contrast">
           Lo que compró
         </h2>
         <p className="mt-2 text-xs text-muted">
-          Estos datos quedaron congelados al momento de la compra. Si después cambiás
-          el precio o la versión del programa, este pedido no se modifica.
+          Datos congelados al momento de la compra: si después cambiás el precio o la versión, este pedido no cambia.
         </p>
 
         <ul className="mt-4 border-t border-border">
           {pedido.items.map((item) => (
             <li
               key={item.productId}
-              className="grid gap-4 border-b border-border py-5 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)_auto]"
+              className="grid gap-3 border-b border-border py-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.9fr)_auto]"
             >
               <div className="min-w-0">
                 <p className="font-semibold">{item.name}</p>
@@ -178,25 +256,22 @@ export default async function AdminPedidoPage({
                   <span className="px-2 text-border">·</span>
                   appId: {item.appId}
                 </p>
-                <p className="mt-2 text-xs text-muted">
+                <p className="mt-1 text-xs text-muted">
+                  {item.licenseRequired ? "Lleva licencia" : "Sin licencia"}
+                  <span className="px-1.5 text-border">·</span>
                   {item.platforms.length === 0 ? "Plataforma no informada" : item.platforms.join(", ")}
                 </p>
               </div>
               <div className="text-sm">
-                <p>
-                  Licencia: {LICENCIA_LABEL[item.licenseStatus] ?? item.licenseStatus}
-                </p>
+                <p>Licencia: {ADMIN_LICENSE_LABEL[licenseDeliveryState(item.licenseStatus)]}</p>
+                <p className="mt-1 text-muted">Asignada: {fecha(item.issuedAt)}</p>
+                {item.licenseId !== null ? <p className="mt-1 break-all text-muted">ID externo: {item.licenseId}</p> : null}
                 <p className="mt-1 text-muted">
-                  Emitida: {item.issuedAt === null ? "—" : new Date(item.issuedAt).toLocaleString("es-AR")}
+                  Descarga: {isItemDownloadEnabled(pedido, item) ? `habilitada (${item.downloadFile?.fileName ?? ""})` : item.downloadFile === null ? "sin archivo asociado" : "no habilitada"}
                 </p>
-                <p className="mt-1 text-muted">
-                  Descarga: {item.downloadFile === null ? "No configurada" : item.downloadFile.fileName}
-                </p>
-                {item.licenseError !== null ? (
-                  <p className="mt-1 text-danger">Código: {item.licenseError}</p>
-                ) : null}
+                {item.licenseError !== null ? <p className="mt-1 text-danger">Código: {item.licenseError}</p> : null}
                 {item.licenseStatus === "issued" ? (
-                  <RevealLicenseButton orderId={pedido.id} productId={item.productId} />
+                  <RevealLicenseButton orderId={pedido.id} productId={item.productId} canVerify={licencias.canLookup} />
                 ) : null}
               </div>
               <p className="shrink-0 lg:text-right">{formatMoney(item.unitPrice)}</p>
@@ -204,7 +279,7 @@ export default async function AdminPedidoPage({
           ))}
         </ul>
 
-        <dl className="mt-6 max-w-xs space-y-3">
+        <dl className="mt-5 max-w-xs space-y-3">
           <div className="flex justify-between gap-4">
             <dt className="text-sm text-muted">Subtotal</dt>
             <dd className="text-sm">{formatMoney(pedido.subtotal)}</dd>
@@ -223,6 +298,7 @@ export default async function AdminPedidoPage({
           (payment?.status ?? pedido.payment.status) === "approved" &&
           pedido.fulfillment.status !== "fulfilled"
         }
+        canResend={pedido.status === "fulfilled" && email.ready}
       />
     </main>
   );
@@ -236,24 +312,54 @@ function Panel({
   readonly children: React.ReactNode;
 }) {
   return (
-    <section className="border border-border bg-surface p-5">
+    <section className="border border-border bg-surface p-4 sm:p-5">
       <h2 className="eyebrow text-accent-contrast">{titulo}</h2>
       <dl className="mt-3">{children}</dl>
     </section>
   );
 }
 
-function Fila({
+function Fila({ etiqueta, valor }: { readonly etiqueta: string; readonly valor: string }) {
+  return (
+    <div className="grid gap-1 border-b border-border py-2.5 last:border-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-baseline sm:gap-3">
+      <dt className="eyebrow">{etiqueta}</dt>
+      <dd className="min-w-0 break-words text-sm sm:text-right">{valor}</dd>
+    </div>
+  );
+}
+
+function FilaEnlace({
   etiqueta,
   valor,
+  href,
+  externo = false,
 }: {
   readonly etiqueta: string;
   readonly valor: string;
+  readonly href: string;
+  readonly externo?: boolean;
 }) {
   return (
     <div className="grid gap-1 border-b border-border py-2.5 last:border-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-baseline sm:gap-3">
       <dt className="eyebrow">{etiqueta}</dt>
-      <dd className="min-w-0 break-all text-sm sm:text-right">{valor}</dd>
+      <dd className="min-w-0 break-all text-sm sm:text-right">
+        <a
+          href={href}
+          {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          className="text-foreground underline decoration-border underline-offset-4 hover:decoration-accent"
+        >
+          {valor}
+        </a>
+      </dd>
+    </div>
+  );
+}
+
+function Dato({ etiqueta, valor }: { readonly etiqueta: string; readonly valor: string }) {
+  return (
+    <div className="bg-background p-3">
+      <dt className="eyebrow">{etiqueta}</dt>
+      <dd className="mt-1 break-all text-sm font-semibold">{valor}</dd>
     </div>
   );
 }

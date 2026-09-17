@@ -170,6 +170,15 @@ export interface Product {
   readonly pricingType: PricingType;
 
   /**
+   * Si la entrega incluye una clave de licencia.
+   *
+   * `false` significa que el programa se entrega solo con la descarga. Los productos
+   * guardados antes de que existiera el campo toman el comportamiento de siempre:
+   * los pagos llevan licencia y los gratuitos se descargan directo, sin clave.
+   */
+  readonly licenseRequired: boolean;
+
+  /**
    * Aportes voluntarios.
    *
    * NO son una compra: no van al carrito, no crean pedido, no emiten licencia y no

@@ -7,8 +7,6 @@ interface CartSummaryProps {
   readonly count: number;
   readonly locale: Locale;
   readonly subtotal: Money;
-  readonly whatsappRequested: boolean;
-  readonly whatsappEnabled: boolean;
 }
 
 /**
@@ -18,14 +16,12 @@ interface CartSummaryProps {
  * Por eso el total es igual al subtotal y no se inventan renglones intermedios.
  *
  * El botón lleva al checkout, donde se piden los datos y se prepara el pedido. No
- * cobra: todavía no hay proveedor de pagos elegido.
+ * cobra: el comprador paga después y el Admin verifica el ingreso.
  */
 export function CartSummary({
   count,
   locale,
   subtotal,
-  whatsappRequested,
-  whatsappEnabled,
 }: CartSummaryProps) {
   const importe = formatMoney(subtotal, numberLocale(locale));
 
@@ -70,11 +66,7 @@ export function CartSummary({
         </Link>
 
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          {whatsappRequested
-            ? whatsappEnabled
-              ? pick(locale, "En el siguiente paso completás tus datos y continuás la compra por WhatsApp. Todavía no se te cobra nada.", "Next, confirm your details and continue via WhatsApp. You will not be charged yet.", "Na próxima etapa você confirma seus dados e continua a compra pelo WhatsApp. Nada será cobrado ainda.")
-              : pick(locale, "La compra por WhatsApp estará disponible cuando terminemos de configurar el número de atención.", "WhatsApp purchases will be available once the support number is configured.", "A compra pelo WhatsApp estará disponível quando terminarmos de configurar o número de atendimento.")
-            : pick(locale, "Todavía no se te cobra nada: el medio de pago aún no está configurado.", "You will not be charged yet: the payment method is not configured.", "Nada será cobrado ainda: o meio de pagamento ainda não está configurado.")}
+          {pick(locale, "En el siguiente paso elegís cómo pagar: Prex, Ualá, transferencia/QR o WhatsApp. Todavía no se te cobra nada.", "Next you choose how to pay: Prex, Ualá, bank transfer/QR or WhatsApp. You will not be charged yet.", "Na próxima etapa você escolhe como pagar: Prex, Ualá, transferência/QR ou WhatsApp. Nada será cobrado ainda.")}
         </p>
 
         <div className="mt-7 border-t border-border pt-5">

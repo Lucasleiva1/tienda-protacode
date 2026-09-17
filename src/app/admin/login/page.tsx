@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/admin/LoginForm";
+import { safeAdminPath } from "@/features/admin/guard";
 import { hasValidSession } from "@/features/admin/session";
 
 export const metadata: Metadata = {
@@ -22,10 +23,13 @@ function devCredentials(): { devEmail?: string; devPassword?: string } {
   };
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/admin/login">) {
+  const params = await searchParams;
+  const next = safeAdminPath(params.next);
+
   // Con sesión abierta no tiene sentido mostrar el login.
   if (await hasValidSession()) {
-    redirect("/admin");
+    redirect(next);
   }
 
   return (
@@ -40,7 +44,7 @@ export default async function LoginPage() {
         <div className="mt-8 border border-border bg-surface">
           <div aria-hidden="true" className="h-px bg-accent/70" />
           <div className="p-6">
-            <LoginForm {...devCredentials()} />
+            <LoginForm {...devCredentials()} next={next} />
           </div>
         </div>
       </div>

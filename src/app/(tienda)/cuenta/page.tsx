@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountShell } from "@/components/account/AccountShell";
 import { logoutCustomerAction } from "@/features/accounts/auth-actions";
@@ -41,10 +42,19 @@ export default async function AccountPage({
         <Row label={pick(locale, "Contraseña", "Password", "Senha")} value={customer.hasPassword ? pick(locale, "Configurada", "Set", "Configurada") : pick(locale, "Ingreso con Google", "Google sign-in", "Login com Google")} />
       </dl>
       {!customer.emailVerified ? <ResendVerificationButton locale={locale} /> : null}
+      <Link
+        href="/cuenta/compras"
+        className="mt-8 block w-full bg-accent px-6 py-3.5 text-center text-sm font-semibold uppercase tracking-[0.08em] text-accent-foreground transition-colors hover:bg-accent-contrast"
+      >
+        {pick(locale, "Mis compras", "My purchases", "Minhas compras")}
+      </Link>
       <form action={logoutCustomerAction} className="mt-8">
         <button className="border border-border px-5 py-3 text-sm font-semibold uppercase tracking-wider hover:border-accent">
           {pick(locale, "Cerrar sesión", "Sign out", "Sair")}
         </button>
+        <p className="mt-2 text-xs text-muted">
+          {pick(locale, "Cierra la sesión en todos tus dispositivos.", "Signs you out on all your devices.", "Encerra a sessão em todos os seus dispositivos.")}
+        </p>
       </form>
     </AccountShell>
   );

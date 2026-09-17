@@ -22,16 +22,12 @@ interface CartViewProps {
   readonly catalog: readonly Product[];
   readonly locale: Locale;
   readonly currency: Currency;
-  readonly whatsappRequested: boolean;
-  readonly whatsappEnabled: boolean;
 }
 
 export function CartView({
   catalog,
   locale,
   currency,
-  whatsappRequested,
-  whatsappEnabled,
 }: CartViewProps) {
   const hidratado = useCartHydrated();
   const lineas = useCartSlugs();
@@ -172,8 +168,6 @@ export function CartView({
           count={productos.length}
           locale={locale}
           subtotal={resolucion.subtotal}
-          whatsappRequested={whatsappRequested}
-          whatsappEnabled={whatsappEnabled}
         />
       </div>
     </div>

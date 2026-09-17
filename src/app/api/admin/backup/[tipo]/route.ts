@@ -4,8 +4,10 @@ import { getProducts } from "@/features/products/queries";
 import type { Order } from "@/types/order";
 
 function standardOrderBackup(order: Order) {
+  const manual = order.manualPayment;
   return {
     id: order.id,
+    reference: order.reference,
     status: order.status,
     customer: order.customer,
     items: order.items.map((item) => ({
@@ -18,6 +20,7 @@ function standardOrderBackup(order: Order) {
       downloadType: item.downloadType,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      licenseRequired: item.licenseRequired,
       licenseStatus: item.licenseStatus,
       issuedAt: item.issuedAt,
       licenseError: item.licenseError,
@@ -29,8 +32,24 @@ function standardOrderBackup(order: Order) {
     subtotal: order.subtotal,
     total: order.total,
     payment: order.payment,
+    // El comprobante se informa solo como metadato: su clave interna no se exporta.
+    manualPayment:
+      manual === null
+        ? null
+        : {
+            ...manual,
+            proof:
+              manual.proof === null
+                ? null
+                : {
+                    contentType: manual.proof.contentType,
+                    size: manual.proof.size,
+                    uploadedAt: manual.proof.uploadedAt,
+                  },
+          },
     licenseStatus: order.licenseStatus,
     fulfillment: order.fulfillment,
+    notifications: order.notifications,
     purchaseAccessConfigured: order.purchaseAccess !== null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,

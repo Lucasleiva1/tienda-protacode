@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminPwaRegistrar } from "@/components/admin/AdminPwaRegistrar";
 import { logoutAction } from "@/features/admin/login-actions";
 import { hasValidSession } from "@/features/admin/session";
 
@@ -7,12 +8,21 @@ export const metadata: Metadata = {
   title: { default: "Admin", template: "%s · Admin Prota Code" },
   /* El panel no se indexa ni aparece en buscadores. */
   robots: { index: false, follow: false, nocache: true },
+  /* App instalable solo para el panel: la tienda pública no la ofrece. */
+  manifest: "/admin/manifest.webmanifest",
+  applicationName: "Prota Admin",
+  appleWebApp: { capable: true, title: "Prota Admin", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [{ url: "/admin-pwa/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/admin-pwa/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 const SECCIONES = [
   { label: "Resumen", href: "/admin" },
-  { label: "Programas", href: "/admin/programas" },
   { label: "Pedidos", href: "/admin/pedidos" },
+  { label: "Programas", href: "/admin/programas" },
+  { label: "Medios de pago", href: "/admin/medios-de-pago" },
   { label: "Configuración", href: "/admin/configuracion" },
 ] as const;
 
@@ -76,6 +86,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         </header>
       ) : null}
 
+      <AdminPwaRegistrar />
       {children}
     </div>
   );

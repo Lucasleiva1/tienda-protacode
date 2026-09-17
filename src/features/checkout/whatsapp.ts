@@ -1,51 +1,21 @@
 import "server-only";
 
-import { formatMoney } from "@/lib/utils/money";
-import type { Order } from "@/types/order";
+import { orderDisplayReference } from "@/features/orders/order-display";
 import { getConfiguredWhatsAppNumber } from "@/features/settings/sales-settings";
+import { formatMoney } from "@/lib/utils/money";
+import { normalizeWhatsAppNumber } from "@/lib/utils/whatsapp-number";
+import type { Order } from "@/types/order";
 
-export interface WhatsAppConfiguration {
-  readonly requested: boolean;
-  readonly ready: boolean;
-  readonly number: string | null;
-  readonly message: string;
-}
+export { normalizeWhatsAppNumber };
 
 /**
- * El número se configura en formato internacional, pero se toleran espacios,
- * paréntesis, guiones y el signo + para que no sea fácil cargarlo mal en Netlify.
+ * WhatsApp es un medio alternativo: sirve para pagar o consultar coordinando por
+ * chat. Abrir la conversación no confirma ningún pago ni habilita una descarga.
  */
-export function normalizeWhatsAppNumber(value: string | undefined): string | null {
-  if (value === undefined) return null;
-  const digits = value.replace(/\D/g, "");
-  return /^\d{8,15}$/.test(digits) ? digits : null;
-}
 
-export async function getWhatsAppConfiguration(): Promise<WhatsAppConfiguration> {
-  const channel = (process.env.SALES_CHANNEL ?? "whatsapp").trim().toLowerCase();
-  const requested = channel === "whatsapp";
-
-  if (!requested) {
-    return {
-      requested: false,
-      ready: false,
-      number: null,
-      message: `El canal de venta activo es “${channel || "payment"}”.`,
-    };
-  }
-
-  const number = await getConfiguredWhatsAppNumber();
-
-  return {
-    requested: true,
-    ready: true,
-    number,
-    message: "Los pedidos se guardan antes de abrir la conversación de WhatsApp.",
-  };
-}
-
-function orderReference(order: Order): string {
-  return order.id.slice(0, 8).toUpperCase();
+/** Número receptor vigente: el del Admin, el de la variable de entorno o el inicial. */
+export function getWhatsAppNumber(): Promise<string> {
+  return getConfiguredWhatsAppNumber();
 }
 
 export function buildWhatsAppMessage(order: Order): string {
@@ -53,17 +23,17 @@ export function buildWhatsAppMessage(order: Order): string {
     const quantity = item.quantity > 1 ? ` × ${item.quantity}` : "";
     return `• ${item.name} v${item.version}${quantity}`;
   });
+  const method = order.manualPayment?.methodLabel ?? null;
 
   return [
-    "Hola, quiero comprar en Prota Code.",
+    "Hola, quiero pagar o consultar mi compra en Prota Code.",
     "",
-    `Pedido: ${orderReference(order)}`,
+    `Pedido: ${orderDisplayReference(order)}`,
     `Nombre: ${order.customer.firstName} ${order.customer.lastName}`,
     "Productos:",
     ...products,
     `Total: ${formatMoney(order.total)}`,
-    "",
-    "Quisiera coordinar el pago y la entrega.",
+    ...(method === null ? [] : [`Medio de pago: ${method}`]),
   ].join("\n");
 }
 

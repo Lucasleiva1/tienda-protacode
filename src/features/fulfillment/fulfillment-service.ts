@@ -8,9 +8,10 @@ import {
   type FulfillmentRepository,
 } from "@/features/fulfillment/fulfillment-repository";
 import { fulfillmentLog } from "@/features/fulfillment/fulfillment-logger";
+import { licenseIdempotencyKey } from "@/features/fulfillment/license-idempotency";
 import { getOrderRepository } from "@/features/orders/persistent-order-repository";
 import type { OrderRepository } from "@/features/orders/order-repository";
-import { isOrderId } from "@/features/orders/order-service";
+import { isOrderId } from "@/features/orders/order-id";
 import { getPaymentRepository } from "@/features/payments/persistent-payment-repository";
 import type { PaymentRepository } from "@/features/payments/payment-repository";
 import { getLicenseProvider, type LicenseProvider } from "@/lib/licensing";
@@ -30,15 +31,28 @@ export interface FulfillmentDependencies {
   readonly licenses: LicenseProvider;
 }
 
-function idempotencyKey(orderId: string, productId: string): string {
-  return `license:${orderId}:${productId}`;
-}
+const idempotencyKey = licenseIdempotencyKey;
 
 function aggregateLicenseStatus(items: readonly OrderItem[]): LicenseStatus {
-  if (items.every((item) => item.licenseStatus === "issued")) return "issued";
-  if (items.some((item) => item.licenseStatus === "pending")) return "pending";
-  if (items.some((item) => item.licenseStatus === "failed")) return "failed";
+  const required = items.filter((item) => item.licenseStatus !== "not_required");
+  if (required.length === 0) return "not_required";
+  if (required.every((item) => item.licenseStatus === "issued")) return "issued";
+  if (required.some((item) => item.licenseStatus === "pending")) return "pending";
+  if (required.some((item) => item.licenseStatus === "failed")) return "failed";
   return "not_requested";
+}
+
+/** Licencia resuelta: asignada o no requerida. */
+function licenseDone(item: OrderItem): boolean {
+  return item.licenseStatus === "issued" || item.licenseStatus === "not_required";
+}
+
+function latestIssuedAt(items: readonly OrderItem[]): string | null {
+  const dates = items
+    .map((item) => item.issuedAt)
+    .filter((value): value is string => value !== null)
+    .sort();
+  return dates.at(-1) ?? null;
 }
 
 function resultStatus(order: Order): FulfillmentResultStatus {
@@ -122,12 +136,32 @@ export class FulfillmentService {
       item.version,
     );
 
+    // Programa sin clave: la entrega es solo la descarga. No se llama al proveedor.
+    if (!item.licenseRequired) {
+      const downloadFile = item.downloadFile ?? availableDownload?.file ?? null;
+      await this.updateItem(orderId, productId, (current) => ({
+        ...current,
+        licenseStatus: "not_required",
+        licenseKey: null,
+        licenseId: null,
+        licenseError: null,
+        downloadFile,
+        downloadEnabledAt:
+          downloadFile === null ? null : current.downloadEnabledAt ?? new Date().toISOString(),
+      }));
+      if (downloadFile !== null) {
+        fulfillmentLog("info", "DOWNLOAD_READY", { orderId, productId });
+      }
+      return;
+    }
+
     if (item.licenseStatus === "issued" && item.licenseKey !== null) {
       if (item.downloadFile === null && availableDownload !== null) {
         await this.projectIssued(
           orderId,
           productId,
           item.licenseKey,
+          item.licenseId,
           item.issuedAt ?? new Date().toISOString(),
           availableDownload.file,
         );
@@ -151,6 +185,7 @@ export class FulfillmentService {
         orderId,
         productId,
         claim.operation.licenseKey,
+        claim.operation.licenseId ?? null,
         claim.operation.issuedAt,
         availableDownload?.file ?? null,
       );
@@ -175,6 +210,9 @@ export class FulfillmentService {
       orderId,
       customerEmail: order.customer.email,
       idempotencyKey: key,
+      productId,
+      orderReference: order.reference,
+      customerId: order.customer.accountId ?? null,
     });
 
     if (!issued.ok) {
@@ -208,11 +246,13 @@ export class FulfillmentService {
       claim.operation,
       issued.license.licenseKey,
       issued.license.issuedAt,
+      issued.license.licenseId ?? null,
     );
     await this.projectIssued(
       orderId,
       productId,
       issued.license.licenseKey,
+      issued.license.licenseId ?? null,
       issued.license.issuedAt,
       availableDownload?.file ?? null,
     );
@@ -229,6 +269,7 @@ export class FulfillmentService {
     orderId: string,
     productId: string,
     licenseKey: string,
+    licenseId: string | null,
     issuedAt: string,
     downloadFile: OrderItem["downloadFile"],
   ): Promise<void> {
@@ -236,6 +277,7 @@ export class FulfillmentService {
       ...item,
       licenseStatus: "issued",
       licenseKey,
+      licenseId,
       issuedAt,
       licenseError: null,
       downloadFile,
@@ -263,19 +305,19 @@ export class FulfillmentService {
   private async finalize(orderId: string): Promise<Order | null> {
     const updated = await this.dependencies.orders.updateAtomically(orderId, (order) => {
       const allReady = order.items.every(
-        (item) => item.licenseStatus === "issued" && item.downloadFile !== null,
+        (item) => licenseDone(item) && item.downloadFile !== null,
       );
       const anyPending = order.items.some((item) => item.licenseStatus === "pending");
-      const anyIssued = order.items.some((item) => item.licenseStatus === "issued");
+      const anyDone = order.items.some(licenseDone);
       const allFailed = order.items.every((item) => item.licenseStatus === "failed");
       const missingDownload = order.items.some(
-        (item) => item.licenseStatus === "issued" && item.downloadFile === null,
+        (item) => licenseDone(item) && item.downloadFile === null,
       );
       const fulfillmentStatus = allReady
         ? "fulfilled"
         : anyPending
           ? "pending"
-          : anyIssued
+          : anyDone
             ? "partial"
             : allFailed
               ? "failed"
@@ -283,16 +325,23 @@ export class FulfillmentService {
       const lastError =
         order.items.find((item) => item.licenseError !== null)?.licenseError ??
         (missingDownload ? "DOWNLOAD_NOT_CONFIGURED" : null);
+      const licenseStatus = aggregateLicenseStatus(order.items);
 
       return {
         ...order,
         status: allReady ? "fulfilled" : "paid",
-        licenseStatus: aggregateLicenseStatus(order.items),
+        licenseStatus,
         fulfillment: {
           ...order.fulfillment,
           status: fulfillmentStatus,
-          completedAt: allReady ? new Date().toISOString() : null,
+          completedAt: allReady
+            ? order.fulfillment.completedAt ?? new Date().toISOString()
+            : null,
           lastError,
+          licenseAssignedAt:
+            licenseStatus === "issued"
+              ? order.fulfillment.licenseAssignedAt ?? latestIssuedAt(order.items)
+              : order.fulfillment.licenseAssignedAt,
         },
       };
     });

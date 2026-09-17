@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { AddToCartButton } from "@/components/cart/AddToCartButton";
 import { FreeDownloadButton } from "@/components/products/FreeDownloadButton";
+import { FreeLicenseButton } from "@/components/products/FreeLicenseButton";
 import { ProductGallery } from "@/components/products/ProductGallery";
 import {
   categoryLabel,
@@ -99,19 +101,33 @@ export function ProductHero({
 
           <div className="mt-7">
             {gratuito ? (
-              <FreeDownloadButton
-                slug={product.slug}
-                available={downloadAvailable}
-                locale={locale}
-              />
+              product.licenseRequired ? (
+                <FreeLicenseButton slug={product.slug} locale={locale} />
+              ) : (
+                <FreeDownloadButton
+                  slug={product.slug}
+                  available={downloadAvailable}
+                  locale={locale}
+                />
+              )
             ) : (
-              <AddToCartButton product={product} locale={locale} className="w-full sm:w-auto" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+                <Link
+                  href={`/comprar/${encodeURIComponent(product.slug)}`}
+                  className="inline-flex min-h-12 items-center justify-center gap-2.5 bg-accent px-8 py-3.5 text-sm font-semibold uppercase tracking-[0.08em] text-accent-foreground transition-colors hover:bg-accent-contrast"
+                >
+                  {pick(locale, "Comprar", "Buy now", "Comprar")}
+                </Link>
+                <AddToCartButton product={product} locale={locale} secondary className="w-full sm:w-auto" />
+              </div>
             )}
 
             <p className="mt-4 max-w-md text-xs leading-relaxed text-muted">
               {gratuito
-                ? pick(locale, "La descarga corresponde a la versión indicada en esta página. No hace falta crear una cuenta ni pagar.", "The download applies to the version shown on this page. No account or payment is required.", "O download corresponde à versão indicada nesta página. Não é preciso criar conta nem pagar.")
-                : pick(locale, "La compra corresponde a la versión indicada en esta página.", "Your purchase applies to the version shown on this page.", "A compra corresponde à versão indicada nesta página.")}
+                ? product.licenseRequired
+                  ? pick(locale, "Es gratis: entrás con tu cuenta y recibís tu licencia para la versión indicada, sin pagar.", "It is free: sign in and get your license for the version shown, with no payment.", "É grátis: entre com sua conta e receba sua licença para a versão indicada, sem pagar.")
+                  : pick(locale, "La descarga corresponde a la versión indicada en esta página. No hace falta crear una cuenta ni pagar.", "The download applies to the version shown on this page. No account or payment is required.", "O download corresponde à versão indicada nesta página. Não é preciso criar conta nem pagar.")
+                : pick(locale, "La compra corresponde a la versión indicada en esta página. Pagás con Prex, Ualá, transferencia/QR o WhatsApp.", "Your purchase applies to the version shown on this page. Pay with Prex, Ualá, bank transfer/QR or WhatsApp.", "A compra corresponde à versão indicada nesta página. Pague com Prex, Ualá, transferência/QR ou WhatsApp.")}
             </p>
           </div>
         </div>

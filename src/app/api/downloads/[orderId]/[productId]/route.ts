@@ -1,4 +1,9 @@
-import { authorizeDownload } from "@/features/downloads/download-authorization";
+import {
+  authorizeDownload,
+  authorizeOrderItemDownload,
+  type DownloadAuthorizationResult,
+} from "@/features/downloads/download-authorization";
+import { resolveOrderAccess } from "@/features/purchases/order-access";
 import {
   getPrivateDownloadStorage,
   NETLIFY_STREAMED_DOWNLOAD_LIMIT_BYTES,
@@ -13,6 +18,13 @@ function attachmentHeader(fileName: string): string {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
+/**
+ * Descarga privada de una compra.
+ *
+ * Dos llaves posibles, siempre por POST:
+ *   - `purchaseToken`: el enlace privado del pedido;
+ *   - sin token: la sesión de la cuenta dueña del pedido ("Mis compras").
+ */
 export async function POST(
   request: Request,
   context: RouteContext<"/api/downloads/[orderId]/[productId]">,
@@ -30,19 +42,25 @@ export async function POST(
     return new Response("Solicitud no válida", { status: 400 });
   }
 
-  if (!allowRequest("purchase-download", token, 12, 60_000)) {
+  const { orderId, productId } = await context.params;
+  if (!allowRequest("purchase-download", token === "" ? `account:${orderId}` : token, 12, 60_000)) {
     return new Response("Demasiadas solicitudes", {
       status: 429,
       headers: { "Retry-After": "60", "Cache-Control": "no-store" },
     });
   }
 
-  const { orderId, productId } = await context.params;
-  const authorization = await authorizeDownload({
-    orderId,
-    productId,
-    purchaseToken: token,
-  });
+  let authorization: DownloadAuthorizationResult;
+  if (token !== "") {
+    authorization = await authorizeDownload({ orderId, productId, purchaseToken: token });
+  } else {
+    const order = await resolveOrderAccess({ kind: "account", orderId });
+    authorization =
+      order === null || order.id !== orderId
+        ? { ok: false, code: "NOT_FOUND", message: "Descarga no encontrada." }
+        : authorizeOrderItemDownload(order, productId);
+  }
+
   if (!authorization.ok) {
     return new Response(authorization.message, {
       status: authorization.code === "NOT_FOUND" ? 404 : 403,

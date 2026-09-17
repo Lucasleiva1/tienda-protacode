@@ -3,7 +3,8 @@ import { AccountShell } from "@/components/account/AccountShell";
 import { CustomerAuthForm } from "@/components/account/CustomerAuthForm";
 import { safeNextPath } from "@/features/accounts/auth-utils";
 import { getCurrentCustomerProfile } from "@/features/accounts/customer-session";
-import { getGoogleAuthConfiguration } from "@/features/accounts/google-auth";
+import { googleRedirectSignInHref } from "@/features/accounts/google-auth";
+import { getGoogleClientId } from "@/features/accounts/google-identity";
 import { getLocale } from "@/i18n/server";
 import { pick } from "@/i18n/shared";
 
@@ -21,7 +22,6 @@ export default async function RegisterPage({
   const locale = await getLocale();
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
   if ((await getCurrentCustomerProfile()) !== null) redirect(next);
-  const google = getGoogleAuthConfiguration();
 
   return (
     <AccountShell
@@ -32,7 +32,8 @@ export default async function RegisterPage({
       <CustomerAuthForm
         mode="register"
         next={next}
-        googleReady={google.ready}
+        googleReady={getGoogleClientId() !== null}
+        googleFallbackHref={googleRedirectSignInHref(next)}
         locale={locale}
       />
     </AccountShell>

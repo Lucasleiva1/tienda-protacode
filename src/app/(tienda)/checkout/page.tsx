@@ -6,9 +6,9 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { siteConfig } from "@/config/site";
 import { getPaymentConfiguration } from "@/lib/payments/gateway-registry";
 import { getPublishedProducts } from "@/features/products/queries";
-import { getWhatsAppConfiguration } from "@/features/checkout/whatsapp";
 import { getCurrentCustomerProfile } from "@/features/accounts/customer-session";
-import { redirect } from "next/navigation";
+import { googleRedirectSignInHref } from "@/features/accounts/google-auth";
+import { getGoogleClientId } from "@/features/accounts/google-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +22,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Checkout.
+ * Checkout del carrito.
  *
- * La página es de servidor y solo lee el catálogo. Lo interactivo (el formulario y
- * la lectura del carrito) vive en `CheckoutView`.
+ * La página es de servidor y solo lee el catálogo y la sesión. Lo interactivo (el
+ * formulario y la lectura del carrito) vive en `CheckoutView`. Se puede comprar con
+ * cuenta (Google o email) o como invitado.
  *
  * Los importes que se muestran acá son informativos: el precio que vale es el que
  * recalcula el servidor al crear el pedido.
@@ -33,12 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CheckoutPage() {
   const locale = await getLocale();
   const customer = await getCurrentCustomerProfile();
-  if (customer === null) redirect("/cuenta/iniciar-sesion?next=/checkout");
-  if (!customer.emailVerified) redirect("/cuenta?verificacion=requerida&next=/checkout");
-
   const catalogo = await getPublishedProducts();
   const payment = getPaymentConfiguration();
-  const whatsapp = await getWhatsAppConfiguration();
 
   return (
     <main>
@@ -67,10 +64,13 @@ export default async function CheckoutPage() {
             catalog={catalogo}
             locale={locale}
             currency={siteConfig.defaultCurrency}
-            paymentEnabled={payment.ready}
-            whatsappRequested={whatsapp.requested}
-            whatsappEnabled={whatsapp.ready}
             customer={customer}
+            paymentMode={payment.ready ? "gateway" : "manual"}
+            googleReady={getGoogleClientId() !== null}
+            googleFallbackHref={googleRedirectSignInHref("/checkout")}
+            returnPath="/checkout"
+            backHref="/carrito"
+            backLabel={pick(locale, "Volver al carrito", "Back to cart", "Voltar ao carrinho")}
           />
         </div>
       </div>

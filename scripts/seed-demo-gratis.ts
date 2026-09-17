@@ -147,6 +147,7 @@ async function main(): Promise<void> {
     systemRequirements: [{ label: "Sistema operativo", value: "Windows 10 o superior" }],
     licenseNote: "Producto de prueba. No es una aplicación real.",
     pricingType: "free",
+    licenseRequired: false,
     acceptDonations: true,
     donationAlias: "protacode.demo",
     donationQr: { src: subida.url, alt: "Código QR para aportar a App Gratis Demo" },

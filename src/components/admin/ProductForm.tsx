@@ -65,6 +65,7 @@ function vacio(product: Product | null): ProductInput {
     systemRequirements: product?.systemRequirements ?? [],
     licenseNote: product?.licenseNote ?? null,
     pricingType: product?.pricingType ?? "paid",
+    licenseRequired: product?.licenseRequired ?? true,
     acceptDonations: product?.acceptDonations ?? false,
     donationAlias: product?.donationAlias ?? null,
     donationQr: product?.donationQr ?? null,
@@ -340,9 +341,11 @@ export function ProductForm({ product }: ProductFormProps) {
                 { valor: "paid", texto: "Pago" },
                 { valor: "free", texto: "Gratis" },
               ]}
-              onChange={(v) =>
-                set("pricingType", v as ProductInput["pricingType"])
-              }
+              onChange={(v) => {
+                set("pricingType", v as ProductInput["pricingType"]);
+                // Valor habitual de cada tipo; se puede cambiar abajo.
+                set("licenseRequired", v === "paid");
+              }}
             />
 
             {gratuito ? (
@@ -378,6 +381,18 @@ export function ProductForm({ product }: ProductFormProps) {
                 />
               </>
             )}
+
+            <Casilla
+              id="licenseRequired"
+              label="Requiere clave de licencia"
+              ayuda={
+                gratuito
+                  ? "Encendido: el cliente entra con su cuenta y recibe una licencia gratis. Apagado: se descarga directo, sin cuenta."
+                  : "Apagado: después de confirmar el pago se entrega solo la descarga, sin clave."
+              }
+              checked={datos.licenseRequired}
+              onChange={(v) => set("licenseRequired", v)}
+            />
           </Bloque>
 
           <Bloque titulo="Aportes voluntarios">

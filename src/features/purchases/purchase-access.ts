@@ -10,22 +10,35 @@ import type { Order, PurchaseAccess } from "@/types/order";
 
 const TOKEN_BYTES = 32;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/** Enlaces por email que se conservan a la vez. El más viejo se revoca primero. */
+const MAX_EXTRA_TOKENS = 5;
+
+interface AccessDependencies {
+  readonly orders?: OrderRepository;
+  readonly access?: PurchaseAccessRepository;
+}
 
 export function hashPurchaseAccessToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+function newToken(): { readonly token: string; readonly tokenHash: string } {
+  const token = randomBytes(TOKEN_BYTES).toString("base64url");
+  return { token, tokenHash: hashPurchaseAccessToken(token) };
 }
 
 export function createPurchaseAccess(): {
   readonly token: string;
   readonly record: PurchaseAccess;
 } {
-  const token = randomBytes(TOKEN_BYTES).toString("base64url");
+  const { token, tokenHash } = newToken();
   return {
     token,
     record: {
-      tokenHash: hashPurchaseAccessToken(token),
+      tokenHash,
       createdAt: new Date().toISOString(),
       rotatedAt: null,
+      extraTokenHashes: [],
     },
   };
 }
@@ -39,12 +52,18 @@ function sameHash(left: string, right: string): boolean {
   return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
 }
 
+function accessMatches(access: PurchaseAccess, tokenHash: string): boolean {
+  // Se comparan todos, sin cortar en el primero, para no filtrar cuál coincidió.
+  let match = false;
+  for (const candidate of [access.tokenHash, ...access.extraTokenHashes]) {
+    if (sameHash(candidate, tokenHash)) match = true;
+  }
+  return match;
+}
+
 export async function findOrderByPurchaseToken(
   token: string,
-  dependencies: {
-    readonly orders?: OrderRepository;
-    readonly access?: PurchaseAccessRepository;
-  } = {},
+  dependencies: AccessDependencies = {},
 ): Promise<Order | null> {
   if (!isPurchaseAccessToken(token)) return null;
   const tokenHash = hashPurchaseAccessToken(token);
@@ -54,20 +73,65 @@ export async function findOrderByPurchaseToken(
   if (orderId === null) return null;
   const order = await orders.findById(orderId);
   if (order === null || order.purchaseAccess === null) return null;
-  return sameHash(order.purchaseAccess.tokenHash, tokenHash) ? order : null;
+  return accessMatches(order.purchaseAccess, tokenHash) ? order : null;
 }
 
 export async function tokenMatchesOrder(token: string, order: Order): Promise<boolean> {
   if (!isPurchaseAccessToken(token) || order.purchaseAccess === null) return false;
-  return sameHash(order.purchaseAccess.tokenHash, hashPurchaseAccessToken(token));
+  return accessMatches(order.purchaseAccess, hashPurchaseAccessToken(token));
+}
+
+/**
+ * Nuevo enlace privado para enviar por email.
+ *
+ * No reemplaza el principal: el comprador puede tener la página abierta mientras el
+ * Admin confirma el pago, y esa página tiene que seguir funcionando.
+ */
+export async function issueAdditionalPurchaseAccess(
+  orderId: string,
+  dependencies: AccessDependencies = {},
+): Promise<string | null> {
+  const orders = dependencies.orders ?? getOrderRepository();
+  const access = dependencies.access ?? getPurchaseAccessRepository();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const next = newToken();
+    if (!(await access.reserve(next.tokenHash, orderId))) continue;
+
+    let dropped: readonly string[] = [];
+    try {
+      const updated = await orders.updateAtomically(orderId, (order) => {
+        if (order.purchaseAccess === null) {
+          dropped = [];
+          return order;
+        }
+        const all = [...order.purchaseAccess.extraTokenHashes, next.tokenHash];
+        dropped = all.slice(0, Math.max(0, all.length - MAX_EXTRA_TOKENS));
+        return {
+          ...order,
+          purchaseAccess: {
+            ...order.purchaseAccess,
+            extraTokenHashes: all.slice(-MAX_EXTRA_TOKENS),
+          },
+        };
+      });
+      if (updated === null || updated.purchaseAccess === null) {
+        await access.remove(next.tokenHash);
+        return null;
+      }
+      for (const hash of dropped) await access.remove(hash);
+      return next.token;
+    } catch (error) {
+      await access.remove(next.tokenHash);
+      throw error;
+    }
+  }
+  throw new Error("PURCHASE_ACCESS_TOKEN_COLLISION");
 }
 
 export async function rotatePurchaseAccess(
   orderId: string,
-  dependencies: {
-    readonly orders?: OrderRepository;
-    readonly access?: PurchaseAccessRepository;
-  } = {},
+  dependencies: AccessDependencies = {},
 ): Promise<{ readonly token: string; readonly order: Order } | null> {
   const orders = dependencies.orders ?? getOrderRepository();
   const access = dependencies.access ?? getPurchaseAccessRepository();
@@ -80,20 +144,27 @@ export async function rotatePurchaseAccess(
   }
 
   try {
-    const updated = await orders.updateAtomically(orderId, (order) => ({
-      ...order,
-      purchaseAccess: {
-        ...next.record,
-        createdAt: order.purchaseAccess?.createdAt ?? next.record.createdAt,
-        rotatedAt: new Date().toISOString(),
-      },
-    }));
+    let previous: PurchaseAccess | null = null;
+    const updated = await orders.updateAtomically(orderId, (order) => {
+      previous = order.purchaseAccess;
+      return {
+        ...order,
+        purchaseAccess: {
+          ...next.record,
+          createdAt: order.purchaseAccess?.createdAt ?? next.record.createdAt,
+          rotatedAt: new Date().toISOString(),
+        },
+      };
+    });
     if (updated === null) {
       await access.remove(next.record.tokenHash);
       return null;
     }
-    if (current.purchaseAccess !== null) {
-      await access.remove(current.purchaseAccess.tokenHash);
+    const revoked = previous as PurchaseAccess | null;
+    if (revoked !== null) {
+      for (const hash of [revoked.tokenHash, ...revoked.extraTokenHashes]) {
+        await access.remove(hash);
+      }
     }
     return { token: next.token, order: updated };
   } catch (error) {

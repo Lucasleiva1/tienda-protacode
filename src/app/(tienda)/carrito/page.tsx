@@ -5,7 +5,6 @@ import { CartView } from "@/components/cart/CartView";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { siteConfig } from "@/config/site";
 import { getPublishedProducts } from "@/features/products/queries";
-import { getWhatsAppConfiguration } from "@/features/checkout/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +32,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CarritoPage() {
   const locale = await getLocale();
   const catalogo = await getPublishedProducts();
-  const whatsapp = await getWhatsAppConfiguration();
 
   return (
     <main>
@@ -58,8 +56,6 @@ export default async function CarritoPage() {
             catalog={catalogo}
             locale={locale}
             currency={siteConfig.defaultCurrency}
-            whatsappRequested={whatsapp.requested}
-            whatsappEnabled={whatsapp.ready}
           />
         </div>
       </div>

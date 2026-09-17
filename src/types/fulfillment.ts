@@ -13,6 +13,8 @@ export interface FulfillmentOperation {
   readonly attemptCount: number;
   readonly leaseUntil: string | null;
   readonly licenseKey: string | null;
+  /** Identificador en el sistema de licencias, si lo informa. Ausente en registros viejos. */
+  readonly licenseId?: string | null;
   readonly issuedAt: string | null;
   readonly errorCode: LicenseErrorCode | null;
   readonly createdAt: string;
@@ -29,7 +31,7 @@ export type FulfillmentResultStatus =
 export interface FulfillmentItemResult {
   readonly productId: string;
   readonly appId: string;
-  readonly licenseStatus: "not_requested" | "pending" | "issued" | "failed";
+  readonly licenseStatus: "not_requested" | "pending" | "issued" | "failed" | "not_required";
   readonly downloadReady: boolean;
   readonly errorCode: LicenseErrorCode | null;
 }

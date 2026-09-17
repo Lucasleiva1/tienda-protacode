@@ -2,9 +2,25 @@ import "server-only";
 import { createDisabledLicenseProvider } from "@/lib/licensing/disabled-license-provider";
 import type { LicenseProvider } from "@/lib/licensing/license-provider";
 import { createMockLicenseProvider } from "@/lib/licensing/mock-license-provider";
+import {
+  createRemoteLicenseProvider,
+  isRemoteLicenseConfigurationValid,
+} from "@/lib/licensing/remote-license-provider";
 import { createRxwCoreLicenseProvider } from "@/lib/licensing/rxw-core-license-provider";
 
 export type { LicenseProvider } from "@/lib/licensing/license-provider";
+
+/**
+ * Registro de proveedores de licencias.
+ *
+ *   none     → seguro por defecto: el pago se confirma y la licencia queda pendiente
+ *   mock     → solo desarrollo y tests; producción lo bloquea
+ *   rxw-core → sistema de licencias actual (RXW-CORE 0.8.x)
+ *   remote   → futura página/API de licencias propia (contrato en docs/)
+ *
+ * Cambiar de proveedor es cambiar LICENSE_PROVIDER y sus variables: el resto de la
+ * tienda no se modifica.
+ */
 
 export interface LicenseConfiguration {
   readonly requestedProvider: string;
@@ -15,6 +31,15 @@ export interface LicenseConfiguration {
 
 function requestedProvider(): string {
   return (process.env.LICENSE_PROVIDER ?? "none").trim().toLowerCase() || "none";
+}
+
+function remoteConfiguration() {
+  return {
+    baseUrl: process.env.LICENSE_API_URL?.trim() ?? "",
+    apiKey: process.env.LICENSE_API_KEY ?? "",
+    signingSecret: process.env.LICENSE_API_SIGNING_SECRET ?? null,
+    environment: process.env.NODE_ENV,
+  };
 }
 
 export function getLicenseConfiguration(): LicenseConfiguration {
@@ -58,6 +83,20 @@ export function getLicenseConfiguration(): LicenseConfiguration {
     };
   }
 
+  if (requested === "remote") {
+    const configuration = remoteConfiguration();
+    const ready = isRemoteLicenseConfigurationValid(configuration);
+    const signed = Boolean(configuration.signingSecret?.trim());
+    return {
+      requestedProvider: requested,
+      activeProvider: ready ? "remote" : null,
+      ready,
+      message: ready
+        ? `API de licencias remota configurada${signed ? " con firma HMAC" : " sin firma HMAC"}.`
+        : "Faltan o no son válidas LICENSE_API_URL y LICENSE_API_KEY (mínimo 32 caracteres).",
+    };
+  }
+
   return {
     requestedProvider: requested,
     activeProvider: null,
@@ -87,6 +126,11 @@ export function getLicenseProvider(): LicenseProvider {
       serviceSecret: process.env.RXW_STORE_SERVICE_SECRET ?? "",
       environment: process.env.NODE_ENV,
     });
+    return provider;
+  }
+
+  if (requested === "remote") {
+    provider = createRemoteLicenseProvider(remoteConfiguration());
     return provider;
   }
 

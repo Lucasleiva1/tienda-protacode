@@ -1,4 +1,5 @@
 import { pick, type Locale } from "@/i18n/shared";
+import { normalizeWhatsAppNumber } from "@/lib/utils/whatsapp-number";
 import type { OrderCustomer } from "@/types/order";
 
 /**
@@ -8,7 +9,7 @@ import type { OrderCustomer } from "@/types/order";
  * una comodidad para el comprador; la validación que MANDA es la del servidor, porque
  * cualquiera puede saltearse la del navegador.
  *
- * Sin librería: son cuatro campos y las reglas entran en una pantalla. Sumar una
+ * Sin librería: son pocos campos y las reglas entran en una pantalla. Sumar una
  * dependencia de validación para esto no se justifica.
  */
 
@@ -17,6 +18,8 @@ export interface CheckoutFormValues {
   readonly lastName: string;
   readonly email: string;
   readonly confirmEmail: string;
+  /** Opcional. Con código de país. */
+  readonly whatsapp: string;
   readonly acceptedTerms: boolean;
 }
 
@@ -57,10 +60,12 @@ export function validateCheckout(
 ): CheckoutValidationOk | CheckoutValidationError {
   const errors: Record<string, string> = {};
 
-  const firstName = normalizarNombre(values.firstName);
-  const lastName = normalizarNombre(values.lastName);
-  const email = normalizarEmail(values.email);
-  const confirmEmail = normalizarEmail(values.confirmEmail);
+  const firstName = normalizarNombre(String(values.firstName ?? ""));
+  const lastName = normalizarNombre(String(values.lastName ?? ""));
+  const email = normalizarEmail(String(values.email ?? ""));
+  const confirmEmail = normalizarEmail(String(values.confirmEmail ?? ""));
+  const whatsappText = String(values.whatsapp ?? "").trim();
+  const whatsapp = whatsappText === "" ? null : normalizeWhatsAppNumber(whatsappText);
 
   if (firstName.length < MIN_NOMBRE) {
     errors.firstName = pick(locale, "Escribí tu nombre.", "Enter your first name.", "Digite seu nome.");
@@ -86,7 +91,11 @@ export function validateCheckout(
     errors.confirmEmail = pick(locale, "Los dos emails no coinciden.", "The two emails do not match.", "Os dois e-mails não coincidem.");
   }
 
-  if (!values.acceptedTerms) {
+  if (whatsappText !== "" && whatsapp === null) {
+    errors.whatsapp = pick(locale, "Escribí el número con código de país, por ejemplo 54 9 11 1234-5678.", "Enter the number with the country code, for example 54 9 11 1234-5678.", "Digite o número com o código do país, por exemplo 54 9 11 1234-5678.");
+  }
+
+  if (values.acceptedTerms !== true) {
     errors.acceptedTerms = pick(locale, "Tenés que aceptar las condiciones para continuar.", "You must accept the terms to continue.", "Você precisa aceitar as condições para continuar.");
   }
 
@@ -94,5 +103,5 @@ export function validateCheckout(
     return { ok: false, errors };
   }
 
-  return { ok: true, customer: { firstName, lastName, email } };
+  return { ok: true, customer: { firstName, lastName, email, whatsapp } };
 }

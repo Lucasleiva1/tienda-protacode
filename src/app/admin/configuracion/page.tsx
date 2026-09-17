@@ -1,16 +1,22 @@
 import Link from "next/link";
+import { getGoogleAuthConfiguration } from "@/features/accounts/google-auth";
+import { getGoogleClientId } from "@/features/accounts/google-identity";
 import { requireAdminPage } from "@/features/admin/guard";
+import { createLicenseService } from "@/features/licensing/license-service";
+import { getPushSubscriptionRepository } from "@/features/notifications/push-subscription-repository";
 import { getPaymentRepository } from "@/features/payments/persistent-payment-repository";
+import {
+  getPaymentMethodSettings,
+  isPaymentMethodUsable,
+} from "@/features/settings/payment-method-settings";
+import { getPrivateDownloadStorage } from "@/lib/downloads/download-storage";
+import { getEmailConfiguration } from "@/lib/email/mailer";
 import {
   getPaymentConfiguration,
   getPaymentGateway,
 } from "@/lib/payments/gateway-registry";
+import { getPushConfiguration } from "@/lib/push/web-push-sender";
 import { getKeyValueStore, isNetlifyRuntime, STORES } from "@/lib/storage/store";
-import { getLicenseConfiguration, getLicenseProvider } from "@/lib/licensing";
-import { getPrivateDownloadStorage } from "@/lib/downloads/download-storage";
-import { getWhatsAppConfiguration } from "@/features/checkout/whatsapp";
-import { WhatsAppSettingsForm } from "@/components/admin/WhatsAppSettingsForm";
-import { getEmailConfiguration } from "@/lib/email/verification-email";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Configuración" };
@@ -22,20 +28,26 @@ export const metadata = { title: "Configuración" };
  * está configurado, dice "configurado", nunca su valor.
  */
 export default async function AdminConfiguracionPage() {
-  await requireAdminPage();
+  await requireAdminPage("/admin/configuracion");
 
   const almacen = getKeyValueStore(STORES.products);
   const cobros = getPaymentGateway();
   const payment = getPaymentConfiguration();
   const paymentRepository = getPaymentRepository();
-  const licensing = getLicenseConfiguration();
-  const licenseProvider = getLicenseProvider();
+  const licencias = createLicenseService().summary();
   const downloads = getPrivateDownloadStorage();
-  const whatsapp = await getWhatsAppConfiguration();
   const email = getEmailConfiguration();
+  const push = getPushConfiguration();
+  const googlePopup = getGoogleClientId() !== null;
+  const googleRedirect = getGoogleAuthConfiguration().ready;
+  const [metodos, dispositivos] = await Promise.all([
+    getPaymentMethodSettings(),
+    push.ready ? getPushSubscriptionRepository().list() : Promise.resolve([]),
+  ]);
+  const activos = metodos.filter(isPaymentMethodUsable);
 
   return (
-    <main className="mx-auto w-full max-w-[900px] px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-[900px] px-4 py-6 sm:px-6 sm:py-10">
       <h1 className="display text-4xl">Configuración</h1>
 
       <div className="mt-8 space-y-4">
@@ -47,23 +59,18 @@ export default async function AdminConfiguracionPage() {
           />
         </Panel>
 
-        <Panel titulo="Almacenamiento">
-          <Fila etiqueta="Motor" valor={almacen.engine} />
-          <Fila etiqueta="Productos" valor={STORES.products} />
-          <Fila etiqueta="Configuración" valor={STORES.settings} />
-          <Fila etiqueta="Clientes" valor={STORES.customers} />
-          <Fila etiqueta="Verificaciones de email" valor={STORES.customerVerifications} />
-          <Fila etiqueta="Límites de intentos" valor={STORES.rateLimits} />
-          <Fila etiqueta="Pedidos" valor={STORES.orders} />
-          <Fila etiqueta="Pagos" valor={STORES.payments} />
-          <Fila etiqueta="Fulfillment" valor={STORES.fulfillment} />
-          <Fila etiqueta="Accesos de compra" valor={STORES.purchaseAccess} />
-          <Fila etiqueta="Downloads metadata" valor={STORES.productDownloads} />
-          <Fila etiqueta="Downloads privados" valor={`${STORES.downloads} · ${downloads.engine}`} />
-          <Fila etiqueta="Imágenes" valor={STORES.media} />
+        <Panel titulo="Pagos manuales">
+          <Fila etiqueta="Medios activos" valor={activos.length === 0 ? "Ninguno" : activos.map((m) => m.name).join(", ")} />
+          <Fila etiqueta="Confirmación" valor="Manual desde Pedidos (solo Admin)" />
+          <Link
+            href="/admin/medios-de-pago"
+            className="mt-3 inline-block border border-border px-4 py-2 text-xs uppercase tracking-wider text-foreground transition-colors hover:border-accent"
+          >
+            Editar medios de pago
+          </Link>
         </Panel>
 
-        <Panel titulo="Medio de pago">
+        <Panel titulo="Pasarela automática">
           <Fila etiqueta="Payment provider" valor={payment.label} />
           <Fila
             etiqueta="Payment status"
@@ -72,45 +79,68 @@ export default async function AdminConfiguracionPage() {
           <Fila etiqueta="Implementación activa" valor={cobros.name} />
           <Fila etiqueta="Persistencia" valor={paymentRepository.name} />
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            {payment.message} No se muestran tokens, firmas ni secretos en este panel.
+            {payment.message} Mientras no haya pasarela, los pedidos usan pagos manuales.
           </p>
         </Panel>
 
-        <Panel titulo="Email de cuentas">
-          <Fila etiqueta="Confirmación por email" valor={email.ready ? "Configurada" : "No configurada"} />
+        <Panel titulo="Notificaciones push">
+          <Fila etiqueta="Claves VAPID" valor={push.ready ? "Configuradas" : "No configuradas"} />
+          <Fila etiqueta="Dispositivos activos" valor={String(dispositivos.length)} />
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            {push.ready
+              ? "Activalas en cada celular desde el Resumen del panel."
+              : "Generá las claves con «npm run push:claves» y cargalas en Netlify."}
+          </p>
+        </Panel>
+
+        <Panel titulo="Ingreso de clientes con Google">
+          <Fila etiqueta="Botón (ventana emergente)" valor={googlePopup ? "Configurado" : "Falta GOOGLE_CLIENT_ID"} />
+          <Fila etiqueta="Alternativa por redirección" valor={googleRedirect ? "Configurada" : "No configurada (opcional)"} />
+          <Fila etiqueta="Permisos pedidos" valor="openid, email, profile" />
+        </Panel>
+
+        <Panel titulo="Email">
+          <Fila
+            etiqueta="Envío"
+            valor={email.localOutbox ? "Bandeja local (.data/outbox)" : email.ready ? "SMTP configurado" : "No configurado"}
+          />
           <Fila etiqueta="Servidor SMTP" valor={email.host === null ? "No configurado" : "Configurado"} />
           <Fila etiqueta="Remitente" valor={email.from === null ? "No configurado" : "Configurado"} />
           <Fila etiqueta="URL pública" valor={email.origin === null ? "No configurada" : "Configurada"} />
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            Las claves SMTP no se muestran ni se guardan en el navegador.
+            Se usa para confirmar cuentas y para enviar el enlace del pedido, el pago aprobado y la licencia. Las
+            claves SMTP no se muestran.
           </p>
-        </Panel>
-
-        <Panel titulo="Canal de venta">
-          <Fila
-            etiqueta="Canal solicitado"
-            valor={whatsapp.requested ? "WhatsApp" : "Pago en línea"}
-          />
-          <Fila
-            etiqueta="WhatsApp"
-            valor={whatsapp.ready ? "Configurado" : "No configurado"}
-          />
-          <p className="mt-3 text-xs leading-relaxed text-muted">
-            {whatsapp.message}
-          </p>
-          {whatsapp.number !== null ? (
-            <WhatsAppSettingsForm number={whatsapp.number} />
-          ) : null}
         </Panel>
 
         <Panel titulo="Licencias">
-          <Fila etiqueta="Proveedor solicitado" valor={licensing.requestedProvider} />
-          <Fila etiqueta="Proveedor activo" valor={licensing.activeProvider ?? "Ninguno"} />
-          <Fila etiqueta="Estado" valor={licensing.ready ? "Ready" : "Not configured"} />
-          <Fila etiqueta="Implementación" valor={licenseProvider.name} />
+          <Fila etiqueta="Proveedor solicitado" valor={licencias.requestedProvider} />
+          <Fila etiqueta="Proveedor activo" valor={licencias.activeProvider ?? "Ninguno"} />
+          <Fila etiqueta="Estado" valor={licencias.ready ? "Ready" : "Not configured"} />
+          <Fila etiqueta="Implementación" valor={licencias.implementation} />
+          <Fila etiqueta="Consulta y validación" valor={licencias.canLookup ? "Disponible" : "No disponible en este proveedor"} />
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            {licensing.message} Las credenciales server-to-server nunca se muestran aquí.
+            {licencias.message} Las credenciales server-to-server nunca se muestran aquí.
           </p>
+        </Panel>
+
+        <Panel titulo="Almacenamiento">
+          <Fila etiqueta="Motor" valor={almacen.engine} />
+          <Fila etiqueta="Productos" valor={STORES.products} />
+          <Fila etiqueta="Configuración" valor={STORES.settings} />
+          <Fila etiqueta="Clientes" valor={STORES.customers} />
+          <Fila etiqueta="Verificaciones de email" valor={STORES.customerVerifications} />
+          <Fila etiqueta="Límites de intentos" valor={STORES.rateLimits} />
+          <Fila etiqueta="Pedidos" valor={STORES.orders} />
+          <Fila etiqueta="Números de pedido" valor={STORES.orderReferences} />
+          <Fila etiqueta="Pagos" valor={STORES.payments} />
+          <Fila etiqueta="Comprobantes (privado)" valor={STORES.paymentProofs} />
+          <Fila etiqueta="Fulfillment" valor={STORES.fulfillment} />
+          <Fila etiqueta="Accesos de compra" valor={STORES.purchaseAccess} />
+          <Fila etiqueta="Dispositivos push" valor={STORES.pushSubscriptions} />
+          <Fila etiqueta="Downloads metadata" valor={STORES.productDownloads} />
+          <Fila etiqueta="Downloads privados" valor={`${STORES.downloads} · ${downloads.engine}`} />
+          <Fila etiqueta="Imágenes" valor={STORES.media} />
         </Panel>
 
         <Panel titulo="Respaldos">

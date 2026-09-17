@@ -22,6 +22,7 @@ export interface FulfillmentRepository {
     operation: FulfillmentOperation,
     licenseKey: string,
     issuedAt: string,
+    licenseId?: string | null,
   ): Promise<FulfillmentOperation>;
   fail(
     operation: FulfillmentOperation,
@@ -114,7 +115,7 @@ export function createFulfillmentRepository(
       throw new Error("FULFILLMENT_CLAIM_RETRY_EXHAUSTED");
     },
 
-    async complete(operation, licenseKey, issuedAt) {
+    async complete(operation, licenseKey, issuedAt, licenseId = null) {
       return mutate(operationKey(operation.orderId, operation.productId), (current) => {
         if (current.status === "issued") {
           if (current.licenseKey !== licenseKey) {
@@ -127,6 +128,7 @@ export function createFulfillmentRepository(
           status: "issued",
           leaseUntil: null,
           licenseKey,
+          licenseId,
           issuedAt,
           errorCode: null,
           updatedAt: clock().toISOString(),

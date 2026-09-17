@@ -2,7 +2,7 @@
 
 import { createPaymentService } from "@/features/payments/payment-service";
 import type { StartPaymentResult } from "@/features/payments/payment-service";
-import { isOrderId } from "@/features/orders/order-service";
+import { isOrderId } from "@/features/orders/order-id";
 
 export type StartPaymentActionResult =
   | {

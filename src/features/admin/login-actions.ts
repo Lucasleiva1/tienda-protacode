@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { safeAdminPath } from "@/features/admin/guard";
 import { verifyPassword } from "@/features/admin/password";
 import {
   createSession,
@@ -59,7 +60,7 @@ export async function loginAction(
   }
 
   await createSession();
-  redirect("/admin");
+  redirect(safeAdminPath(formData.get("next")));
 }
 
 export async function logoutAction(): Promise<void> {

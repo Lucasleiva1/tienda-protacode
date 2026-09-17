@@ -45,6 +45,8 @@ export interface ProductInput {
   readonly licenseNote: string | null;
   /** "paid" o "free". Un producto gratuito no pasa por carrito ni checkout. */
   readonly pricingType: PricingType;
+  /** Si la entrega incluye clave de licencia. */
+  readonly licenseRequired: boolean;
   readonly acceptDonations: boolean;
   readonly donationAlias: string | null;
   readonly donationQr: ProductImage | null;
@@ -205,6 +207,7 @@ async function construir(
         ? null
         : input.licenseNote.trim(),
     pricingType: input.pricingType,
+    licenseRequired: input.licenseRequired === true,
     acceptDonations: input.acceptDonations,
     donationAlias: donationAlias === "" ? null : donationAlias,
     donationQr: input.donationQr,

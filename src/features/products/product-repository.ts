@@ -48,9 +48,13 @@ function ordenar(productos: readonly Product[]): readonly Product[] {
 function normalizar<T extends Product | null>(producto: T): T {
   if (producto === null) return producto;
   const parcial = producto as Partial<Product>;
+  const pricingType = parcial.pricingType === "free" ? "free" : "paid";
   return {
     ...producto,
-    pricingType: parcial.pricingType === "free" ? "free" : "paid",
+    pricingType,
+    // Antes del campo: los pagos llevaban licencia y los gratuitos se descargaban sin clave.
+    licenseRequired:
+      typeof parcial.licenseRequired === "boolean" ? parcial.licenseRequired : pricingType === "paid",
     acceptDonations: parcial.acceptDonations === true,
     donationAlias: parcial.donationAlias ?? null,
     donationQr: parcial.donationQr ?? null,

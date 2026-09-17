@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountShell } from "@/components/account/AccountShell";
 import { CustomerAuthForm } from "@/components/account/CustomerAuthForm";
 import { safeNextPath } from "@/features/accounts/auth-utils";
 import { getCurrentCustomerProfile } from "@/features/accounts/customer-session";
-import { getGoogleAuthConfiguration } from "@/features/accounts/google-auth";
+import { googleRedirectSignInHref } from "@/features/accounts/google-auth";
+import { getGoogleClientId } from "@/features/accounts/google-identity";
 import { getLocale } from "@/i18n/server";
 import { pick } from "@/i18n/shared";
 
@@ -21,7 +23,6 @@ export default async function LoginPage({
   const locale = await getLocale();
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
   if ((await getCurrentCustomerProfile()) !== null) redirect(next);
-  const google = getGoogleAuthConfiguration();
 
   return (
     <AccountShell
@@ -32,10 +33,17 @@ export default async function LoginPage({
       <CustomerAuthForm
         mode="login"
         next={next}
-        googleReady={google.ready}
+        googleReady={getGoogleClientId() !== null}
+        googleFallbackHref={googleRedirectSignInHref(next)}
         googleError={typeof params.error === "string" ? params.error : undefined}
         locale={locale}
       />
+      <p className="mt-6 text-center text-sm text-muted">
+        {pick(locale, "¿Compraste como invitado? ", "Bought as a guest? ", "Comprou como convidado? ")}
+        <Link href="/compras/recuperar" className="text-foreground underline decoration-border underline-offset-4 hover:decoration-accent">
+          {pick(locale, "Recuperá tu compra", "Recover your purchase", "Recupere sua compra")}
+        </Link>
+      </p>
     </AccountShell>
   );
 }

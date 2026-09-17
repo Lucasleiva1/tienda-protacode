@@ -11,10 +11,27 @@ import { hasValidSession } from "@/features/admin/session";
  * verifica la sesión por su cuenta.
  */
 
-/** Para páginas: si no hay sesión, manda al login. */
-export async function requireAdminPage(): Promise<void> {
+/**
+ * Destino seguro después del login: solo rutas internas del panel.
+ * Evita redirecciones abiertas hacia otros sitios.
+ */
+export function safeAdminPath(value: unknown): string {
+  if (typeof value !== "string" || value.length > 300) return "/admin";
+  if (!/^\/admin(\/[A-Za-z0-9._~%-]*)*$/.test(value)) return "/admin";
+  if (value.split("/").some((segment) => segment === "." || segment === "..")) return "/admin";
+  if (value.startsWith("/admin/login")) return "/admin";
+  return value;
+}
+
+/** Para páginas: si no hay sesión, manda al login y vuelve a `next` después. */
+export async function requireAdminPage(next?: string): Promise<void> {
   if (!(await hasValidSession())) {
-    redirect("/admin/login");
+    const destination = safeAdminPath(next);
+    redirect(
+      destination === "/admin"
+        ? "/admin/login"
+        : `/admin/login?next=${encodeURIComponent(destination)}`,
+    );
   }
 }
 

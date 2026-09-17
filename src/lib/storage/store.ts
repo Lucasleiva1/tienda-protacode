@@ -258,7 +258,12 @@ export const STORES = {
   rateLimits: "prota-code-rate-limits",
   products: "prota-code-products",
   orders: "prota-code-orders",
+  /** Contador PC-XXXX e índices auxiliares. Separado: `orders` solo guarda pedidos. */
+  orderReferences: "prota-code-order-references",
   payments: "prota-code-payments",
+  /** Comprobantes privados. Nunca se sirven sin sesión Admin. */
+  paymentProofs: "prota-code-payment-proofs",
+  pushSubscriptions: "prota-code-push-subscriptions",
   fulfillment: "prota-code-fulfillment",
   purchaseAccess: "prota-code-purchase-access",
   productDownloads: "prota-code-product-downloads",

@@ -27,6 +27,7 @@ export async function saveWhatsAppNumberAction(
   await saveConfiguredWhatsAppNumber(number);
   revalidatePath("/", "layout");
   revalidatePath("/admin/configuracion");
+  revalidatePath("/admin/medios-de-pago");
 
   return { ok: true, message: "Número de WhatsApp actualizado." };
 }

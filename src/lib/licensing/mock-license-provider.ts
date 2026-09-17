@@ -90,6 +90,7 @@ export function createMockLicenseProvider(
       sequence += 1;
       const license: IssuedLicense = {
         licenseKey: buildMockKey(input.appId, sequence),
+        licenseId: `mock-${sequence}`,
         appId: input.appId,
         status: "SOLD",
         issuedAt: new Date().toISOString(),
@@ -98,6 +99,23 @@ export function createMockLicenseProvider(
       issued.set(input.idempotencyKey, license);
 
       return { ok: true, license };
+    },
+
+    async getLicense(input) {
+      assertServerOnly();
+      const previous = issued.get(input.idempotencyKey);
+      if (previous === undefined || previous.appId !== input.appId) {
+        return { ok: true, found: false };
+      }
+      return { ok: true, found: true, license: { ...previous, replayed: true } };
+    },
+
+    async validateLicense(input) {
+      assertServerOnly();
+      const match = [...issued.values()].find(
+        (license) => license.appId === input.appId && license.licenseKey === input.licenseKey,
+      );
+      return { ok: true, valid: match !== undefined, status: match?.status ?? null };
     },
   };
 }

@@ -14,6 +14,16 @@ export function getGoogleAuthConfiguration(): GoogleAuthConfiguration {
   return { ready: clientId !== null && clientSecret !== null, clientId, clientSecret };
 }
 
+/**
+ * Ingreso por redirección (código OAuth). Queda como alternativa al botón de
+ * ventana emergente y necesita además GOOGLE_CLIENT_SECRET.
+ */
+export function googleRedirectSignInHref(next: string): string | null {
+  return getGoogleAuthConfiguration().ready
+    ? `/api/auth/google/start?next=${encodeURIComponent(next)}`
+    : null;
+}
+
 export function googleRedirectUri(origin: string): string {
   return `${origin.replace(/\/$/, "")}/api/auth/google/callback`;
 }

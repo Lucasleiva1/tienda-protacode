@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CloseIcon, MenuIcon } from "@/components/ui/Icons";
+import { logoutCustomerAction } from "@/features/accounts/auth-actions";
 import { pick, type Locale } from "@/i18n/shared";
 import type { NavItem } from "@/config/site";
 
 interface MobileNavProps {
   readonly items: readonly NavItem[];
   readonly locale: Locale;
+  /** "Hola, Nombre" con sesión iniciada; `null` sin sesión. */
+  readonly greeting?: string | null;
 }
 
-export function MobileNav({ items, locale }: MobileNavProps) {
+export function MobileNav({ items, locale, greeting = null }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -36,6 +39,9 @@ export function MobileNav({ items, locale }: MobileNavProps) {
           className="absolute inset-x-0 top-16 border-b border-border bg-background"
         >
           <ul className="mx-auto max-w-[1400px] px-4 py-2 sm:px-6">
+            {greeting !== null ? (
+              <li className="border-b border-border/60 py-3 text-sm text-accent-contrast">{greeting}</li>
+            ) : null}
             {items.map((item) => (
               <li key={item.href} className="border-b border-border/60 last:border-0">
                 <Link
@@ -47,6 +53,15 @@ export function MobileNav({ items, locale }: MobileNavProps) {
                 </Link>
               </li>
             ))}
+            {greeting !== null ? (
+              <li>
+                <form action={logoutCustomerAction}>
+                  <button type="submit" className="block w-full py-4 text-left text-base text-muted">
+                    {pick(locale, "Cerrar sesión", "Sign out", "Sair")}
+                  </button>
+                </form>
+              </li>
+            ) : null}
           </ul>
         </nav>
       ) : null}

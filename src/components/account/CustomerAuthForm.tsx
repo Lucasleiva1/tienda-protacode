@@ -9,11 +9,15 @@ import {
   type CustomerAuthState,
 } from "@/features/accounts/auth-actions";
 import { pick, type Locale } from "@/i18n/shared";
+import { GoogleSignInButton } from "@/components/account/GoogleSignInButton";
 
 interface CustomerAuthFormProps {
   readonly mode: "login" | "register";
   readonly next: string;
+  /** Google Identity Services disponible (hay Client ID). */
   readonly googleReady: boolean;
+  /** Ingreso por redirección, alternativa si el navegador bloquea la ventana. */
+  readonly googleFallbackHref: string | null;
   readonly googleError?: string | undefined;
   readonly locale: Locale;
 }
@@ -22,6 +26,7 @@ export function CustomerAuthForm({
   mode,
   next,
   googleReady,
+  googleFallbackHref,
   googleError,
   locale,
 }: CustomerAuthFormProps) {
@@ -34,8 +39,10 @@ export function CustomerAuthForm({
   return (
     <div>
       {googleReady ? (
+        <GoogleSignInButton next={next} locale={locale} fallbackHref={googleFallbackHref} />
+      ) : googleFallbackHref !== null ? (
         <Link
-          href={`/api/auth/google/start?next=${encodeURIComponent(next)}`}
+          href={googleFallbackHref}
           className="block w-full border border-border bg-surface px-6 py-3.5 text-center text-sm font-semibold uppercase tracking-[0.08em] text-foreground transition-colors hover:border-accent"
         >
           {pick(locale, "Continuar con Google", "Continue with Google", "Continuar com o Google")}
@@ -53,7 +60,9 @@ export function CustomerAuthForm({
 
       {googleError !== undefined ? (
         <p className="mt-4 border border-danger/50 bg-danger/10 px-3 py-2 text-sm">
-          {pick(locale, "No pudimos iniciar sesión con Google. Probá nuevamente.", "We could not sign you in with Google. Please try again.", "Não foi possível entrar com o Google. Tente novamente.")}
+          {googleError === "google-cancelled"
+            ? pick(locale, "Cancelaste el ingreso con Google.", "You cancelled Google sign-in.", "Você cancelou o login com Google.")
+            : pick(locale, "No pudimos iniciar sesión con Google. Probá nuevamente.", "We could not sign you in with Google. Please try again.", "Não foi possível entrar com o Google. Tente novamente.")}
         </p>
       ) : null}
 
@@ -103,7 +112,7 @@ export function CustomerAuthForm({
 
       {mode === "register" ? (
         <p className="mt-4 text-xs leading-relaxed text-muted">
-          {pick(locale, "Te enviaremos un enlace para confirmar tu email. La cuenta debe estar confirmada antes de comprar.", "We will send you a link to confirm your email. Your account must be confirmed before you can buy.", "Enviaremos um link para confirmar seu e-mail. A conta precisa estar confirmada antes de comprar.")}
+          {pick(locale, "Te enviaremos un enlace para confirmar tu email. Con la cuenta confirmada, tus compras quedan guardadas en Mis compras.", "We will send you a link to confirm your email. Once confirmed, your purchases are kept in My purchases.", "Enviaremos um link para confirmar seu e-mail. Com a conta confirmada, suas compras ficam em Minhas compras.")}
         </p>
       ) : null}
 

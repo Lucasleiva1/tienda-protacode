@@ -15,6 +15,8 @@ import {
   consumeEmailVerification,
   issueEmailVerification,
 } from "@/features/accounts/email-verification";
+import { findCustomerById } from "@/features/accounts/customer-repository";
+import { linkGuestOrdersToAccount } from "@/features/accounts/guest-order-linking";
 import { sendVerificationEmail } from "@/lib/email/verification-email";
 import { allowPersistentRequest } from "@/lib/security/persistent-rate-limit";
 import { safeNextPath } from "@/features/accounts/auth-utils";
@@ -100,6 +102,7 @@ export async function loginCustomerAction(
   if (!(await createCustomerSession(account.id))) {
     return { message: pick(locale, "La sesión de clientes todavía no está configurada en el servidor.", "Customer sessions are not configured on the server yet.", "A sessão de clientes ainda não está configurada no servidor.") };
   }
+  await linkGuestOrdersToAccount(account).catch(() => 0);
 
   redirect(safeNextPath(String(formData.get("next") ?? "")));
 }
@@ -147,5 +150,7 @@ export async function confirmEmailAction(
   if (!(await createCustomerSession(accountId))) {
     return { ok: false, message: pick(locale, "El email fue confirmado, pero no pudimos iniciar la sesión.", "Your email was confirmed, but we could not sign you in.", "O e-mail foi confirmado, mas não foi possível iniciar a sessão.") };
   }
+  const confirmed = await findCustomerById(accountId);
+  if (confirmed !== null) await linkGuestOrdersToAccount(confirmed).catch(() => 0);
   redirect("/cuenta?verificacion=confirmada");
 }

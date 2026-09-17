@@ -8,9 +8,11 @@ interface LoginFormProps {
   /** Solo en desarrollo: credenciales de prueba precargadas. En producción llegan vacías. */
   readonly devEmail?: string;
   readonly devPassword?: string;
+  /** Ruta del panel a la que se vuelve después de entrar. */
+  readonly next?: string;
 }
 
-export function LoginForm({ devEmail, devPassword }: LoginFormProps = {}) {
+export function LoginForm({ devEmail, devPassword, next = "/admin" }: LoginFormProps = {}) {
   const [estado, accion] = useActionState<LoginResult, FormData>(
     loginAction,
     undefined,
@@ -18,6 +20,7 @@ export function LoginForm({ devEmail, devPassword }: LoginFormProps = {}) {
 
   return (
     <form action={accion} className="space-y-5">
+      <input type="hidden" name="next" value={next} />
       <div>
         <label htmlFor="admin-email" className="eyebrow">
           Email

@@ -9,6 +9,7 @@ import {
   googleAuthOrigin,
 } from "@/features/accounts/google-auth";
 import { safeNextPath } from "@/features/accounts/auth-utils";
+import { linkGuestOrdersToAccount } from "@/features/accounts/guest-order-linking";
 
 const STATE_COOKIE = "pc_google_state";
 const NEXT_COOKIE = "pc_google_next";
@@ -70,10 +71,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       firstName,
       lastName,
       emailVerified: true,
+      avatarUrl: payload.picture ?? null,
     });
     if (account === null || !(await createCustomerSession(account.id))) {
       return failure(origin, "google-account");
     }
+    await linkGuestOrdersToAccount(account).catch(() => 0);
 
     return NextResponse.redirect(new URL(safeNextPath(next), origin));
   } catch {

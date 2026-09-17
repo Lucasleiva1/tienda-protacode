@@ -2,9 +2,23 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { findCustomerById } from "@/features/accounts/customer-repository";
+import {
+  findCustomerById,
+  incrementCustomerSessionVersion,
+} from "@/features/accounts/customer-repository";
 import { customerProfile } from "@/features/accounts/account-service";
 import type { CustomerAccount, CustomerProfile } from "@/types/customer-account";
+
+/**
+ * Sesión propia de la tienda.
+ *
+ * Cookie firmada con HMAC, `HttpOnly` (el JavaScript de la página no la lee),
+ * `SameSite=Lax` y `Secure` en producción. Contiene solo el id interno, el
+ * vencimiento y la versión de sesión de la cuenta; nunca el token de Google.
+ *
+ * Cerrar sesión incrementa la versión guardada en la cuenta: cualquier cookie
+ * anterior deja de valer en el servidor aunque alguien la haya copiado.
+ */
 
 const COOKIE = "pc_customer";
 const DURATION_SECONDS = 7 * 24 * 60 * 60;
@@ -22,34 +36,22 @@ function sign(payload: string, secret: string): string {
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
-export async function createCustomerSession(accountId: string): Promise<boolean> {
-  const secret = sessionSecret();
-  if (secret === null) return false;
-
-  const payload = Buffer.from(
-    JSON.stringify({ id: accountId, exp: Date.now() + DURATION_SECONDS * 1000 }),
-  ).toString("base64url");
-  const value = `${payload}.${sign(payload, secret)}`;
-
-  (await cookies()).set(COOKIE, value, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: DURATION_SECONDS,
-  });
-  return true;
+interface SessionPayload {
+  readonly id: string;
+  readonly exp: number;
+  readonly v: number;
 }
 
-export async function destroyCustomerSession(): Promise<void> {
-  (await cookies()).delete(COOKIE);
+export function encodeCustomerSession(payload: SessionPayload, secret: string): string {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${sign(encoded, secret)}`;
 }
 
-async function sessionAccountId(): Promise<string | null> {
-  const secret = sessionSecret();
-  const value = (await cookies()).get(COOKIE)?.value;
-  if (secret === null || value === undefined) return null;
-
+export function decodeCustomerSession(
+  value: string,
+  secret: string,
+  now: number = Date.now(),
+): SessionPayload | null {
   const split = value.lastIndexOf(".");
   if (split <= 0) return null;
   const payload = value.slice(0, split);
@@ -62,20 +64,73 @@ async function sessionAccountId(): Promise<string | null> {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
       id?: unknown;
       exp?: unknown;
+      v?: unknown;
     };
-    return typeof parsed.id === "string" &&
-      typeof parsed.exp === "number" &&
-      parsed.exp > Date.now()
-      ? parsed.id
-      : null;
+    if (typeof parsed.id !== "string" || typeof parsed.exp !== "number" || parsed.exp <= now) {
+      return null;
+    }
+    // Las cookies anteriores a la versión de sesión equivalen a la versión 0.
+    const version = parsed.v === undefined ? 0 : parsed.v;
+    if (typeof version !== "number" || !Number.isSafeInteger(version)) return null;
+    return { id: parsed.id, exp: parsed.exp, v: version };
   } catch {
     return null;
   }
 }
 
+/** La sesión vale solo si la cuenta existe y su versión coincide. */
+export function sessionMatchesAccount(
+  session: SessionPayload,
+  account: CustomerAccount | null,
+): account is CustomerAccount {
+  return account !== null && account.id === session.id && account.sessionVersion === session.v;
+}
+
+export async function createCustomerSession(accountId: string): Promise<boolean> {
+  const secret = sessionSecret();
+  if (secret === null) return false;
+  const account = await findCustomerById(accountId);
+  if (account === null) return false;
+
+  const value = encodeCustomerSession(
+    { id: account.id, exp: Date.now() + DURATION_SECONDS * 1000, v: account.sessionVersion },
+    secret,
+  );
+
+  (await cookies()).set(COOKIE, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: DURATION_SECONDS,
+  });
+  return true;
+}
+
+async function currentSession(): Promise<SessionPayload | null> {
+  const secret = sessionSecret();
+  const value = (await cookies()).get(COOKIE)?.value;
+  if (secret === null || value === undefined) return null;
+  return decodeCustomerSession(value, secret);
+}
+
+/** Cierra la sesión en el navegador y la invalida en el servidor. */
+export async function destroyCustomerSession(): Promise<void> {
+  const session = await currentSession();
+  if (session !== null) {
+    const account = await findCustomerById(session.id);
+    if (sessionMatchesAccount(session, account)) {
+      await incrementCustomerSessionVersion(account.id);
+    }
+  }
+  (await cookies()).delete(COOKIE);
+}
+
 export async function getCurrentCustomerAccount(): Promise<CustomerAccount | null> {
-  const id = await sessionAccountId();
-  return id === null ? null : findCustomerById(id);
+  const session = await currentSession();
+  if (session === null) return null;
+  const account = await findCustomerById(session.id);
+  return sessionMatchesAccount(session, account) ? account : null;
 }
 
 export async function getCurrentCustomerProfile(): Promise<CustomerProfile | null> {

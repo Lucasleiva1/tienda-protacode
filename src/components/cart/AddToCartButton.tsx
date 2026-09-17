@@ -11,6 +11,8 @@ interface AddToCartButtonProps {
   readonly product: Product;
   readonly className?: string;
   readonly compact?: boolean;
+  /** Estilo de borde, para cuando "Comprar" es la acción principal. */
+  readonly secondary?: boolean;
   readonly locale?: Locale;
 }
 
@@ -20,6 +22,7 @@ export function AddToCartButton({
   product,
   className = "",
   compact = false,
+  secondary = false,
   locale = "es",
 }: AddToCartButtonProps) {
   const inCart = useIsInCart(product.slug);
@@ -63,7 +66,9 @@ export function AddToCartButton({
           className={
             compact
               ? "inline-flex min-h-12 w-full items-center justify-center gap-2 bg-accent px-4 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-contrast disabled:cursor-default disabled:border disabled:border-border disabled:bg-transparent disabled:text-foreground"
-              : "inline-flex items-center justify-center gap-2.5 bg-accent px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.08em] text-accent-foreground transition-colors hover:bg-accent-contrast disabled:cursor-default disabled:border disabled:border-border disabled:bg-transparent disabled:text-muted"
+              : secondary
+                ? "inline-flex min-h-12 items-center justify-center gap-2.5 border border-border px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.08em] text-foreground transition-colors hover:border-accent disabled:cursor-default disabled:text-muted"
+                : "inline-flex items-center justify-center gap-2.5 bg-accent px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.08em] text-accent-foreground transition-colors hover:bg-accent-contrast disabled:cursor-default disabled:border disabled:border-border disabled:bg-transparent disabled:text-muted"
           }
         >
           {inCart ? null : <CartIcon className="h-4 w-4" />}

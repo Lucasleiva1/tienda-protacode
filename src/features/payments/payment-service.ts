@@ -6,7 +6,7 @@ import { getPaymentRepository } from "@/features/payments/persistent-payment-rep
 import type { PaymentRepository } from "@/features/payments/payment-repository";
 import { getOrderRepository } from "@/features/orders/persistent-order-repository";
 import type { OrderRepository } from "@/features/orders/order-repository";
-import { isOrderId } from "@/features/orders/order-service";
+import { isOrderId } from "@/features/orders/order-id";
 import { getPaymentGateway } from "@/lib/payments/gateway-registry";
 import {
   PaymentGatewayError,
