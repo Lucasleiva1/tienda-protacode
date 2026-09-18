@@ -283,4 +283,6 @@ export const STORES = {
   productDownloads: "prota-code-product-downloads",
   downloads: "prota-code-downloads",
   media: "prota-code-media",
+  /** Contadores de visitas por día, mes y año. Solo totales: ni IP ni datos personales. */
+  visits: "prota-code-visits",
 } as const;

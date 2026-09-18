@@ -124,7 +124,9 @@ export function OrderDetailView({
 }: OrderDetailViewProps) {
   const t = (texts: Texts) => pick(locale, ...texts);
   const stage = getOrderStage(order);
-  const text = STAGE_TEXT[stage];
+  // Con un único medio activo no hay elección: el pedido pendiente ya es "realizá el pago".
+  const onlyMethod = methods.length === 1 ? (methods[0] ?? null) : null;
+  const text = STAGE_TEXT[stage === "pending" && onlyMethod !== null ? "awaiting_payment" : stage];
   const confirmed = isPaymentConfirmed(order);
   const reference = orderDisplayReference(order);
   const manual = order.manualPayment;
@@ -167,7 +169,7 @@ export function OrderDetailView({
             value={
               order.payment.provider === "free"
                 ? t(["Gratis", "Free", "Grátis"])
-                : manual?.methodLabel ?? t(["Sin elegir", "Not chosen", "Não escolhido"])
+                : manual?.methodLabel ?? onlyMethod?.name ?? t(["Sin elegir", "Not chosen", "Não escolhido"])
             }
           />
         </dl>

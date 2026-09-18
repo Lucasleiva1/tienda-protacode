@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --conditions=react-server --test src/lib/payments/payment-service.test.ts src/features/fulfillment/fulfillment-service.test.ts src/features/checkout/whatsapp.test.ts src/features/accounts/account-auth.test.ts",
+    "test": "tsx --conditions=react-server --test src/lib/payments/payment-service.test.ts src/features/fulfillment/fulfillment-service.test.ts src/features/checkout/whatsapp.test.ts src/features/accounts/account-auth.test.ts src/features/analytics/visits.test.ts",
     "admin:clave": "tsx --conditions=react-server scripts/admin-password.ts",
     "seed:productos": "tsx --conditions=react-server scripts/seed-products.ts",
     "descarga:importar": "tsx --conditions=react-server scripts/import-download.ts"

@@ -1,3 +1,4 @@
+import { VisitTracker } from "@/components/analytics/VisitTracker";
 import { CartHydrator } from "@/features/cart/CartHydrator";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
@@ -15,6 +16,7 @@ export default async function TiendaLayout({ children }: LayoutProps<"/">) {
         {pick(locale, "Saltar al contenido", "Skip to content", "Pular para o conteúdo")}
       </a>
       <CartHydrator />
+      <VisitTracker />
       <Header locale={locale} />
       <div id="contenido">{children}</div>
       <Footer locale={locale} />

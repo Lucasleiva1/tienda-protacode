@@ -11,7 +11,10 @@ import {
   parseOrderAccessInput,
   resolveOrderAccess,
 } from "@/features/purchases/order-access";
-import { isManualPaymentMethodId } from "@/features/settings/payment-method-settings";
+import {
+  getActivePaymentMethods,
+  isManualPaymentMethodId,
+} from "@/features/settings/payment-method-settings";
 import { getLocale } from "@/i18n/server";
 import { pick, type Locale } from "@/i18n/shared";
 import { allowPersistentRequest } from "@/lib/security/persistent-rate-limit";
@@ -166,7 +169,19 @@ export async function reportPaymentAction(
     ]);
   }
 
-  const result = await createManualPaymentService().reportPayment(order.id, proof.upload);
+  const service = createManualPaymentService();
+
+  // Con un único medio activo la pantalla no ofrece elegir: se toma ese medio.
+  if (order.manualPayment?.method == null) {
+    const activos = await getActivePaymentMethods();
+    const unico = activos.length === 1 ? activos[0] : undefined;
+    if (unico !== undefined) {
+      const elegido = await service.selectMethod(order.id, unico.id);
+      if (!elegido.ok) return fromResult(locale, elegido, ["", "", ""]);
+    }
+  }
+
+  const result = await service.reportPayment(order.id, proof.upload);
   return fromResult(locale, result, [
     "Pago informado. Estamos verificando tu pago.",
     "Payment reported. We are verifying your payment.",

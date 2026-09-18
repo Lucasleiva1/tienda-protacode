@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PushNotificationsPanel } from "@/components/admin/PushNotificationsPanel";
 import { requireAdminPage } from "@/features/admin/guard";
+import { getVisitSummary, type VisitSummary } from "@/features/analytics/visits";
 import { getPushSubscriptionRepository } from "@/features/notifications/push-subscription-repository";
 import {
   adminOrderPath,
@@ -37,10 +38,11 @@ export default async function AdminInicioPage() {
   await requireAdminPage();
 
   const push = getPushConfiguration();
-  const [productos, pedidos, dispositivos] = await Promise.all([
+  const [productos, pedidos, dispositivos, visitas] = await Promise.all([
     getProducts(),
     findAllOrders(),
     push.ready ? getPushSubscriptionRepository().list() : Promise.resolve([]),
+    getVisitSummary(),
   ]);
 
   const stages = new Map(pedidos.map((pedido) => [pedido.id, getOrderStage(pedido)]));
@@ -129,6 +131,8 @@ export default async function AdminInicioPage() {
         </section>
       ) : null}
 
+      <Visitas resumen={visitas} />
+
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <PushNotificationsPanel publicKey={push.publicKey} devices={dispositivos.length} />
 
@@ -167,6 +171,83 @@ export default async function AdminInicioPage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+/** Visitas a la tienda: una por persona y por día. Sin datos personales. */
+function Visitas({ resumen }: { readonly resumen: VisitSummary }) {
+  const maxDia = Math.max(1, ...resumen.dias.map((d) => d.visitas));
+  const maxMes = Math.max(1, ...resumen.meses.map((m) => m.visitas));
+
+  return (
+    <section aria-labelledby="visitas" className="mt-8 border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="visitas" className="eyebrow text-accent-contrast">
+          Visitas a la tienda
+        </h2>
+        <p className="text-xs text-muted">Cada persona cuenta una vez por día. Tus visitas con el panel abierto no suman.</p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Cifra etiqueta="Hoy" valor={resumen.hoy} />
+        <Cifra etiqueta="Ayer" valor={resumen.ayer} />
+        <Cifra etiqueta="Este mes" valor={resumen.mes} />
+        <Cifra etiqueta="Este año" valor={resumen.anio} />
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div>
+          <p className="eyebrow">Últimos 14 días</p>
+          <ol className="mt-3 flex h-36 items-end gap-1">
+            {resumen.dias.map(({ dia, visitas }) => {
+              const fecha = new Date(`${dia}T12:00:00Z`);
+              return (
+                <li key={dia} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+                  <span className="text-[10px] text-muted">{visitas}</span>
+                  <span
+                    className="w-full bg-accent/70"
+                    style={{ height: `${Math.max(2, (visitas / maxDia) * 100)}%` }}
+                    title={`${dia}: ${visitas} visitas`}
+                  />
+                  <span className="text-[10px] leading-tight text-muted">
+                    {DIAS_SEMANA[fecha.getUTCDay()]}
+                    <br />
+                    {fecha.getUTCDate()}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+
+        <div>
+          <p className="eyebrow">Por mes ({resumen.meses[0]?.mes.slice(0, 4) ?? ""})</p>
+          <ul className="mt-3 space-y-1.5">
+            {resumen.meses.map(({ mes, visitas }) => (
+              <li key={mes} className="flex items-center gap-3 text-sm">
+                <span className="w-9 shrink-0 text-muted">{MESES[Number(mes.slice(5, 7)) - 1]}</span>
+                <span className="h-3 flex-1 bg-background">
+                  <span className="block h-full bg-accent/70" style={{ width: `${(visitas / maxMes) * 100}%` }} />
+                </span>
+                <span className="w-12 shrink-0 text-right font-semibold">{visitas}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Cifra({ etiqueta, valor }: { readonly etiqueta: string; readonly valor: number }) {
+  return (
+    <div className="border border-border bg-background px-4 py-3">
+      <p className="eyebrow">{etiqueta}</p>
+      <p className="display mt-1 text-3xl">{valor.toLocaleString("es-AR")}</p>
+    </div>
   );
 }
 

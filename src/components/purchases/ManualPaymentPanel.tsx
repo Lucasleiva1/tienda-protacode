@@ -40,7 +40,10 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
   const busy = useRef(false);
 
   const t = (es: string, en: string, pt: string) => pick(locale, es, en, pt);
-  const selected = props.methods.find((method) => method.id === props.selectedMethod) ?? null;
+  // Con un único medio activo no hay nada que elegir: se muestra directo.
+  const onlyMethod = props.methods.length === 1 ? (props.methods[0] ?? null) : null;
+  const selected = props.methods.find((method) => method.id === props.selectedMethod) ?? onlyMethod;
+  const step = (n: number) => (onlyMethod === null ? n : n - 1);
 
   function run(task: () => Promise<CustomerPaymentActionResult>) {
     // Candado inmediato: dos toques seguidos no disparan dos solicitudes.
@@ -205,11 +208,13 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
 
   return (
     <section aria-labelledby="pago-titulo" className="border border-border bg-surface p-5 sm:p-7">
-      <p id="pago-titulo" className="eyebrow text-accent-contrast">
-        {t("1 · Elegí cómo pagar", "1 · Choose how to pay", "1 · Escolha como pagar")}
-      </p>
+      {onlyMethod === null ? (
+        <p id="pago-titulo" className="eyebrow text-accent-contrast">
+          {t("1 · Elegí cómo pagar", "1 · Choose how to pay", "1 · Escolha como pagar")}
+        </p>
+      ) : null}
 
-      {props.methods.length === 0 ? (
+      {onlyMethod !== null ? null : props.methods.length === 0 ? (
         <p className="mt-4 text-sm leading-relaxed text-muted">
           {t(
             "Todavía no hay medios de pago disponibles. Escribinos y lo resolvemos.",
@@ -248,9 +253,10 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
       )}
 
       {selected !== null ? (
-        <div className="mt-7 border-t border-border pt-6">
-          <p className="eyebrow text-accent-contrast">
-            {t("2 · Pagá con ", "2 · Pay with ", "2 · Pague com ")}
+        <div className={onlyMethod === null ? "mt-7 border-t border-border pt-6" : ""}>
+          <p id={onlyMethod === null ? undefined : "pago-titulo"} className="eyebrow text-accent-contrast">
+            {`${step(2)} · `}
+            {t("Pagá con ", "Pay with ", "Pague com ")}
             {selected.name}
           </p>
 
@@ -361,7 +367,8 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
 
           <form onSubmit={submitReport} className="mt-7 space-y-4 border-t border-border pt-6" encType="multipart/form-data">
             <p className="eyebrow text-accent-contrast">
-              {t("3 · Después de pagar", "3 · After paying", "3 · Depois de pagar")}
+              {`${step(3)} · `}
+              {t("Después de pagar", "After paying", "Depois de pagar")}
             </p>
             {proofInput}
             <button
