@@ -157,6 +157,14 @@ export async function reportPaymentAction(
 
   const proof = await readProof(formData, locale);
   if (!proof.ok) return proof.result;
+  // Obligatorio: sin comprobante, el Admin no tiene con qué cruzar el pago.
+  if (proof.upload === null) {
+    return failure(locale, [
+      "Adjuntá el comprobante de la transferencia para avisarnos que pagaste.",
+      "Attach the transfer receipt to let us know you paid.",
+      "Anexe o comprovante da transferência para nos avisar que pagou.",
+    ]);
+  }
 
   const result = await createManualPaymentService().reportPayment(order.id, proof.upload);
   return fromResult(locale, result, [

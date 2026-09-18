@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import { CopyButton } from "@/components/purchases/CopyButton";
+import { ProofDropzone } from "@/components/purchases/ProofDropzone";
 import {
   reportPaymentAction,
   selectPaymentMethodAction,
@@ -13,9 +14,6 @@ import type { OrderAccessInput } from "@/features/purchases/order-access";
 import type { PublicPaymentMethod } from "@/features/settings/payment-method-settings";
 import { pick, type Locale } from "@/i18n/shared";
 import type { ManualPaymentMethodId, ManualPaymentStatus } from "@/types/manual-payment";
-
-const MAX_PROOF_BYTES = 3 * 1024 * 1024;
-const PROOF_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf";
 
 export interface ManualPaymentPanelProps {
   readonly access: OrderAccessInput;
@@ -37,6 +35,8 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<CustomerPaymentActionResult | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofMissing, setProofMissing] = useState(false);
   const busy = useRef(false);
 
   const t = (es: string, en: string, pt: string) => pick(locale, es, en, pt);
@@ -65,36 +65,32 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
     });
   }
 
-  function proofError(form: HTMLFormElement): string | null {
-    const file = (form.elements.namedItem("comprobante") as HTMLInputElement | null)?.files?.[0];
-    if (file === undefined) return null;
-    if (file.size > MAX_PROOF_BYTES) {
-      return t("El comprobante pesa más de 3 MB.", "The receipt is larger than 3 MB.", "O comprovante tem mais de 3 MB.");
-    }
-    return null;
+  /** El comprobante es obligatorio: sin archivo no se envía nada. */
+  function requireProof(): boolean {
+    if (proofFile !== null) return true;
+    setProofMissing(true);
+    setResult({
+      ok: false,
+      message: t(
+        "Adjuntá el comprobante de la transferencia para avisarnos que pagaste.",
+        "Attach the transfer receipt to let us know you paid.",
+        "Anexe o comprovante da transferência para nos avisar que pagou.",
+      ),
+    });
+    return false;
   }
 
   function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const error = proofError(form);
-    if (error !== null) {
-      setResult({ ok: false, message: error });
-      return;
-    }
-    const data = new FormData(form);
+    if (!requireProof()) return;
+    const data = new FormData(event.currentTarget);
     run(() => reportPaymentAction(props.access, data));
   }
 
   function submitProof(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const error = proofError(form);
-    if (error !== null) {
-      setResult({ ok: false, message: error });
-      return;
-    }
-    const data = new FormData(form);
+    if (!requireProof()) return;
+    const data = new FormData(event.currentTarget);
     run(() => uploadPaymentProofAction(props.access, data));
   }
 
@@ -122,26 +118,19 @@ export function ManualPaymentPanel(props: ManualPaymentPanelProps) {
     );
 
   const proofInput = (
-    <div>
-      <label htmlFor="comprobante" className="eyebrow">
-        {t("Comprobante (opcional)", "Receipt (optional)", "Comprovante (opcional)")}
-      </label>
-      <input
-        id="comprobante"
-        name="comprobante"
-        type="file"
-        accept={PROOF_ACCEPT}
-        disabled={pending}
-        className="mt-2 block w-full cursor-pointer border border-border bg-background px-3 py-2.5 text-sm text-foreground file:mr-3 file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-xs file:uppercase file:tracking-wider file:text-foreground"
-      />
-      <p className="mt-1.5 text-xs leading-relaxed text-muted">
-        {t(
-          "JPG, PNG, WEBP o PDF, hasta 3 MB. Nos ayuda a encontrar tu pago, pero la aprobación la hacemos verificando el ingreso.",
-          "JPG, PNG, WEBP or PDF, up to 3 MB. It helps us find your payment, but we approve it only after verifying the funds.",
-          "JPG, PNG, WEBP ou PDF, até 3 MB. Ajuda a encontrar seu pagamento, mas a aprovação só acontece após verificarmos o valor.",
-        )}
-      </p>
-    </div>
+    <ProofDropzone
+      name="comprobante"
+      locale={locale}
+      disabled={pending}
+      missing={proofMissing}
+      onChange={(file) => {
+        setProofFile(file);
+        if (file !== null) {
+          setProofMissing(false);
+          setResult(null);
+        }
+      }}
+    />
   );
 
   /* ------------------------------ rechazado ------------------------------ */
